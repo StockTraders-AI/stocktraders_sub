@@ -1023,7 +1023,7 @@ export default function StockTradersLanding() {
         ...options,
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || "Lỗi kết nối backend");
+      if (!res.ok) throw new Error(data?.error || `Lỗi kết nối backend (${res.status})`);
       return data;
     };
 
