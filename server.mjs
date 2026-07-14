@@ -10,6 +10,7 @@ const PORT = Number(process.env.PORT || 5010);
 const DATA_DIR = path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "leads.sqlite");
 const DIST_DIR = path.join(__dirname, "dist");
+const APP_BASE = normalizeBase(process.env.APP_BASE || "/ra-mat-web-2026");
 
 await mkdir(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(DB_FILE);
@@ -25,20 +26,29 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_leads_ts ON leads(ts DESC);
 `);
 
+function normalizeBase(value) {
+  const base = String(value || "").trim();
+  if (!base || base === "/") return "";
+  return "/" + base.replace(/^\/+|\/+$/g, "");
+}
+
+function stripBase(pathname) {
+  if (!APP_BASE) return pathname;
+  if (pathname === APP_BASE) return "/";
+  if (pathname.startsWith(APP_BASE + "/")) return pathname.slice(APP_BASE.length) || "/";
+  return pathname;
+}
+
+function withBase(pathname) {
+  return APP_BASE ? APP_BASE + pathname : pathname;
+}
+
 const sendJson = (res, status, payload) => {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
   });
   res.end(JSON.stringify(payload));
-};
-
-const sendHtml = (res, status, html) => {
-  res.writeHead(status, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": "no-store",
-  });
-  res.end(html);
 };
 
 const readBody = (req) =>
@@ -68,66 +78,16 @@ const escapeHtml = (value) =>
 const listLeads = () =>
   db.prepare("SELECT key, name, phone, email, exp, ts FROM leads ORDER BY ts DESC").all();
 
-const renderHb = () => {
-  const leads = listLeads();
-  const rows = leads.length
-    ? leads.map((lead, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(new Date(lead.ts).toLocaleString("vi-VN"))}</td>
-          <td>${escapeHtml(lead.name)}</td>
-          <td>${escapeHtml(lead.phone)}</td>
-          <td>${escapeHtml(lead.email)}</td>
-          <td>${escapeHtml(lead.exp)}</td>
-        </tr>`).join("")
-    : '<tr><td colspan="6" class="empty">Chưa có ai gửi thông tin.</td></tr>';
-
-  return `<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>HB - Leads</title>
-  <style>
-    body{font-family:Arial,sans-serif;background:#0A0D14;color:#F0F4FF;margin:0;padding:24px}
-    h1{font-size:22px;margin:0 0 6px}.meta{color:#8fa1bd;margin-bottom:18px;font-size:14px}
-    table{width:100%;border-collapse:collapse;background:#111520;border:1px solid #242E42;border-radius:10px;overflow:hidden}
-    th,td{padding:10px 12px;border-bottom:1px solid #242E42;text-align:left;font-size:14px}
-    th{color:#A8B8D0;background:#171D2E;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
-    tr:last-child td{border-bottom:0}.empty{text-align:center;color:#5C7090;padding:28px}
-    a{color:#3DD68C;text-decoration:none}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:16px}
-  </style>
-</head>
-<body>
-  <div class="top">
-    <div>
-      <h1>Danh sách người gửi thông tin</h1>
-      <div class="meta">Tổng: ${leads.length} | Lưu tại SQLite: data/leads.sqlite</div>
-    </div>
-    <a href="/hb">Làm mới</a>
-  </div>
-  <table>
-    <thead><tr><th>#</th><th>Thời gian</th><th>Họ tên</th><th>SĐT</th><th>Email</th><th>Kinh nghiệm</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
-</body>
-</html>`;
-};
-
 const handleRoutes = async (req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
+  const routePath = stripBase(url.pathname);
 
-  if (url.pathname === "/hb" && req.method === "GET") {
-    sendHtml(res, 200, renderHb());
-    return true;
-  }
-
-  if (url.pathname === "/api/leads" && req.method === "GET") {
+  if (routePath === "/api/leads" && req.method === "GET") {
     sendJson(res, 200, { leads: listLeads() });
     return true;
   }
 
-  if (url.pathname === "/api/leads" && req.method === "POST") {
+  if (routePath === "/api/leads" && req.method === "POST") {
     const body = await readBody(req);
     const input = body ? JSON.parse(body) : {};
     const name = cleanValue(input.name);
@@ -154,14 +114,14 @@ const handleRoutes = async (req, res) => {
     return true;
   }
 
-  if (url.pathname.startsWith("/api/leads/") && req.method === "DELETE") {
-    const key = decodeURIComponent(url.pathname.slice("/api/leads/".length));
+  if (routePath.startsWith("/api/leads/") && req.method === "DELETE") {
+    const key = decodeURIComponent(routePath.slice("/api/leads/".length));
     db.prepare("DELETE FROM leads WHERE key = ?").run(key);
     sendJson(res, 200, { ok: true });
     return true;
   }
 
-  if (url.pathname.startsWith("/api/")) {
+  if (routePath.startsWith("/api/")) {
     sendJson(res, 404, { error: "API không tồn tại." });
     return true;
   }
@@ -184,7 +144,7 @@ const contentTypes = {
 
 const serveStatic = async (req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
-  const requestedPath = decodeURIComponent(url.pathname);
+  const requestedPath = decodeURIComponent(stripBase(url.pathname));
   const safePath = requestedPath === "/" ? "/index.html" : requestedPath;
   const filePath = path.normalize(path.join(DIST_DIR, safePath));
 
@@ -223,6 +183,5 @@ createServer(async (req, res) => {
     sendJson(res, 500, { error: err.message || "Lỗi server" });
   }
 }).listen(PORT, "0.0.0.0", () => {
-  console.log("Backend/API running on http://localhost:" + PORT);
-  console.log("HB page: http://localhost:" + PORT + "/hb");
+  console.log("App running on http://localhost:" + PORT + withBase("/"));
 });

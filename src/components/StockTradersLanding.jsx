@@ -18,10 +18,10 @@ import { useEffect, useRef } from "react";
   LƯU Ý VỀ LƯU TRỮ DỮ LIỆU:
   Form đăng ký gửi dữ liệu về backend Node đơn giản qua /api/leads. Backend
   lưu chung vào SQLite ở data/leads.sqlite trên server, nên các máy khác
-  cùng mở website từ server đó sẽ thấy cùng danh sách trong admin panel hoặc /hb.
+  cùng mở website từ server đó sẽ thấy cùng danh sách trong admin panel.
 
 
-  Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
+  Mã PIN admin demo: 2026 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
   đây chỉ là rào chắn phía client, không phải bảo mật thực sự).
 */
 
@@ -965,7 +965,7 @@ const BODY_HTML = `
         </tbody>
       </table>
       <div style="margin-top:12px;font-size:11.5px;color:var(--t4)">
-        * Dữ liệu đang lưu trên SQLite backend chung của website. Mở /hb để xem nhanh ai đã gửi thông tin.
+        * Dữ liệu đang lưu trên SQLite backend chung của website. Bấm dòng © 2026 StockTraders ở footer và nhập PIN để xem danh sách.
       </div>
     </div>
   </div>
@@ -1014,8 +1014,9 @@ export default function StockTradersLanding() {
       }
     });
 
-    const ADMIN_PIN = "260726"; // demo PIN — đổi khi triển khai thật
-    const API_BASE = "/api";
+    const ADMIN_PIN = "2026"; // demo PIN — đổi khi triển khai thật
+    const appBase = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const API_BASE = (appBase || "") + "/api";
 
     const requestJson = async (path, options = {}) => {
       const res = await fetch(API_BASE + path, {
