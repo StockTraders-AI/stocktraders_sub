@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.19.0/iconfont/tabler-icons.min.css" />
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
 
@@ -583,7 +583,7 @@
     const area = getEditableArea();
     if (!area) return;
     try {
-      const data = await requestJson("", { apiBase: "/api/page-content" });
+      const data = await requestJson("", { apiBase: "api/page-content" });
       if (data?.html && String(data.html).trim()) {
         area.innerHTML = data.html;
       }
@@ -627,7 +627,7 @@
     try {
       setEditStatus("Đang lưu...");
       await requestJson("", {
-        apiBase: "/api/page-content",
+        apiBase: "api/page-content",
         method: "POST",
         body: JSON.stringify({ html: cleanEditableHtml() }),
       });
@@ -642,7 +642,7 @@
   async function resetEditableContent() {
     if (!confirm("Reset phần UI phía trên form về mẫu ban đầu?")) return;
     try {
-      await requestJson("", { apiBase: "/api/page-content", method: "DELETE" });
+      await requestJson("", { apiBase: "api/page-content", method: "DELETE" });
       location.reload();
     } catch (err) {
       console.error("Không reset được UI:", err);
@@ -838,7 +838,7 @@
     }[c]));
 
   const requestJson = async (path = "", options = {}) => {
-    const apiBase = options.apiBase || "/api/leads";
+    const apiBase = options.apiBase || "api/leads";
     const finalOptions = { ...options };
     delete finalOptions.apiBase;
     const res = await fetch(apiBase + path, {
