@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local SQLite leads database
+info.db
+info.db-shm
+info.db-wal

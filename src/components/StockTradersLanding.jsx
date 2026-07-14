@@ -16,8 +16,8 @@ import { useEffect, useRef } from "react";
     nằm trong HTML string ở trên có thể gọi tới (giữ đúng hành vi bản gốc).
 
   LƯU Ý VỀ LƯU TRỮ DỮ LIỆU:
-  Form đăng ký gửi dữ liệu về API /api/leads. Backend Node lưu dữ liệu
-  vào SQLite tại data/leads.sqlite. Admin panel ẩn vẫn mở bằng dòng
+  Form đăng ký gửi dữ liệu về API /api/leads. Server Node lưu dữ liệu
+  vào SQLite tại info.db. Admin panel ẩn vẫn mở bằng dòng
   © 2026 StockTraders ở footer và mã PIN bên dưới.
 
 
@@ -965,7 +965,7 @@ const BODY_HTML = `
         </tbody>
       </table>
       <div style="margin-top:12px;font-size:11.5px;color:var(--t4)">
-        * Dữ liệu lưu trong SQLite backend. Bấm dòng © 2026 StockTraders ở footer và nhập PIN để xem danh sách.
+        * Dữ liệu lưu trong info.db. Bấm dòng © 2026 StockTraders ở footer và nhập PIN để xem danh sách.
       </div>
     </div>
   </div>
@@ -1023,7 +1023,7 @@ export default function StockTradersLanding() {
         ...options,
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || `Lỗi kết nối backend (${res.status})`);
+      if (!res.ok) throw new Error(data?.error || `Lỗi kết nối API (${res.status})`);
       return data;
     };
 
@@ -1074,9 +1074,9 @@ export default function StockTradersLanding() {
         leadsCacheRef.current = leads;
         renderLeads(leads);
       } catch (err) {
-        console.error("Không tải được leads từ backend:", err);
+        console.error("Không tải được leads từ API:", err);
         tbody.innerHTML =
-          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được backend lưu đăng ký.</td></tr>';
+          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được API lưu đăng ký.</td></tr>';
       }
     };
 
@@ -1107,16 +1107,12 @@ export default function StockTradersLanding() {
         });
         if (data?.lead) leadsCacheRef.current = [data.lead, ...leadsCacheRef.current];
       } catch (err) {
-        console.error("Lưu đăng ký vào backend thất bại:", err);
+        console.error("Lưu đăng ký vào API thất bại:", err);
         errBox.textContent =
-          "⚠️ Không thể lưu đăng ký. Vui lòng kiểm tra backend đang chạy.";
+          "⚠️ Không thể lưu đăng ký. Vui lòng kiểm tra server đang chạy.";
         errBox.style.display = "block";
         btn.disabled = false;
         btn.innerHTML = originalHTML;
-        return;
-      }
-
-      btn.innerHTML = originalHTML;
         return;
       }
 
@@ -1173,8 +1169,8 @@ export default function StockTradersLanding() {
         leadsCacheRef.current = leadsCacheRef.current.filter((l) => l.key !== key);
         renderLeads(leadsCacheRef.current);
       } catch (err) {
-        console.error("Không xoá được lead từ backend:", err);
-        alert("Không xoá được, vui lòng kiểm tra backend rồi thử lại.");
+        console.error("Không xoá được lead từ API:", err);
+        alert("Không xoá được, vui lòng kiểm tra server rồi thử lại.");
       }
     };
 
