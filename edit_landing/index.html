@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>StockTraders AI</title>
+    <meta name="description" content="StockTraders AI - Hệ thống dò sóng và phân tích dòng tiền thị trường chứng khoán Việt Nam." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.19.0/iconfont/tabler-icons.min.css" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+
+
+  <div id="edit-toolbar" class="edit-toolbar" aria-live="polite">
+    <strong>Chế độ sửa UI</strong>
+    <button type="button" onclick="addEditableSection()">+ Section</button>
+    <button type="button" onclick="openHtmlPaste()">Dán HTML</button>
+    <button type="button" onclick="saveEditableContent()">Lưu UI</button>
+    <button type="button" onclick="resetEditableContent()">Reset mẫu</button>
+    <button type="button" onclick="disableEditMode()">Tắt sửa</button>
+    <span id="edit-status"></span>
+  </div>
+  <div id="html-paste-modal" class="html-paste-modal" style="display:none">
+    <div class="html-paste-box">
+      <div class="html-paste-title">Dán HTML cho phần UI phía trên form</div>
+      <textarea id="paste-html-input" spellcheck="false" placeholder="Dán HTML ở đây..."></textarea>
+      <div class="html-paste-actions">
+        <button type="button" onclick="applyPastedHtml('replace')">Thay toàn bộ UI</button>
+        <button type="button" onclick="applyPastedHtml('append')">Thêm vào cuối</button>
+        <button type="button" onclick="closeHtmlPaste()">Đóng</button>
+      </div>
+    </div>
+  </div>
+  <main id="editable-area"><!-- ══════════ NAV ══════════ -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-ic"><svg width="19" height="17" viewBox="0 0 230 200" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M200.55,88.45c-5.85,0-10.73,0-14.65,0V55.43h-5.59v33.02c-4.27,0-7.44,0-10.26,0v0h-2.83v69.72c14.44-11.38,25.23-27.56,30.35-45.74C199.65,106.04,200.55,94.97,200.55,88.45z"/><path fill="#fff" d="M115.23,55.43V22.28h-5.59v33.14h-13.6v40.74l-0.21,79.39c6.85,1.54,16.41,1.63,16.41,1.63c5.02,0,11.31-0.54,16.37-1.47l0.22-79.54V55.43H115.23z"/><path fill="#fff" d="M151.02,110.37V77.02h-5.59v33.35h-13.6v44.28v20.4c10.99-2.49,21.93-7.03,32.79-14.97v-5.43v-44.28H151.02z"/><path fill="#fff" d="M79.39,77.02V44.44h-5.6l-0.07,32.58H60.2v51.56v31.25c9.04,6.84,21.26,12.58,32.76,15.12l0.02-46.37V77.02H79.39z"/><path fill="#fff" d="M43.63,33.45V0.51h-5.59v32.93h-13.6v36.24v14.26v9.01c1.31,25.93,13.82,49.22,32.79,64.53v-87.8V33.45H43.63z"/><path fill="#fff" d="M112.61,180.69c-50.58,0-91.65-40.71-92.26-91.15h0v-0.18c-0.01-0.32-0.03-0.64-0.03-0.96c0-0.32,0.02-0.63,0.03-0.96v-54C9.21,50.63,2.71,66.39,2.71,88.4c0,60.69,49.2,109.9,109.9,109.9c60.7,0,109.9-49.21,109.9-109.9h-17.6C204.91,139.37,163.58,180.69,112.61,180.69z"/></svg></div>
+    <div class="nav-brand">StockTraders<span> AI</span></div>
+  </div>
+  <div class="discount-pill">
+    <i class="ti ti-bolt" style="font-size:13px"></i>
+    Ưu đãi 50% · Kích hoạt 02/08/2026
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('register').scrollIntoView({behavior:'smooth'})">
+    <i class="ti ti-bolt" style="font-size:14px"></i>Đăng ký ưu đãi
+  </button>
+</nav>
+
+<!-- ══════════ HERO ══════════ -->
+<section class="hero">
+  <div class="hero-glow"></div>
+
+  <div class="hero-eyebrow">
+    <span class="ldot"></span>
+    Đúng sóng · Đúng ngành · Đi trước dòng tiền
+  </div>
+
+  <h1>
+    Hệ thống dò sóng<br>
+    <em>chính xác nhất</em><br>
+    thị trường chứng khoán Việt
+  </h1>
+
+  <p class="hero-sub">
+    Nhận diện chân sóng sớm hơn thị trường. Dữ liệu dòng tiền ngành — SMDT — 402 mã cổ phiếu theo thời gian thực.
+    Lịch sử <strong style="color:var(--t1)">10 năm</strong> để AI học, để bạn tin.
+  </p>
+
+  <div class="hero-ctas">
+    <button class="btn-primary" onclick="document.getElementById('register').scrollIntoView({behavior:'smooth'})">
+      <i class="ti ti-bolt" style="font-size:15px"></i>Đăng ký giảm 50% ngay
+    </button>
+    <button class="btn-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">
+      Khám phá tính năng <i class="ti ti-arrow-down" style="font-size:14px"></i>
+    </button>
+  </div>
+
+  <!-- Donut demo -->
+  <div class="hero-visual">
+    <div class="ai-badge"><i class="ti ti-sparkles" style="font-size:12px"></i> AI · Tin cậy 78%</div>
+    <div class="donut-wrap">
+      <div>
+        <div class="donut-meta">Vòng tròn dò sóng · 402 mã · 19/06/2026</div>
+        <svg width="160" height="160" viewBox="0 0 160 160" id="hero-donut">
+          <circle cx="80" cy="80" r="62" fill="none" stroke="var(--bdr)" stroke-width="22"/>
+          <!-- Chờ mua 40.5% -->
+          <circle cx="80" cy="80" r="62" fill="none" stroke="var(--G)" stroke-width="22"
+            stroke-dasharray="157.2 246.8" stroke-dashoffset="0" stroke-linecap="butt"
+            style="transform:rotate(-90deg);transform-origin:80px 80px"/>
+          <!-- Mua 8% -->
+          <circle cx="80" cy="80" r="62" fill="none" stroke="#1A8A4A" stroke-width="22"
+            stroke-dasharray="31.0 373.0" stroke-dashoffset="-157.2" stroke-linecap="butt"
+            style="transform:rotate(-90deg);transform-origin:80px 80px"/>
+          <!-- Chờ bán 30.6% -->
+          <circle cx="80" cy="80" r="62" fill="none" stroke="var(--A)" stroke-width="22"
+            stroke-dasharray="118.6 285.4" stroke-dashoffset="-188.2" stroke-linecap="butt"
+            style="transform:rotate(-90deg);transform-origin:80px 80px"/>
+          <!-- Bán 20.9% -->
+          <circle cx="80" cy="80" r="62" fill="none" stroke="var(--R)" stroke-width="22"
+            stroke-dasharray="81.1 322.9" stroke-dashoffset="-306.8" stroke-linecap="butt"
+            style="transform:rotate(-90deg);transform-origin:80px 80px"/>
+          <text x="80" y="88" text-anchor="middle" fill="var(--t1)" font-size="32" font-weight="800" font-family="JetBrains Mono,monospace">402</text>
+        </svg>
+      </div>
+      <div class="donut-stats">
+        <div class="ds-item ds-G"><div class="ds-lbl">Chờ mua</div><div class="ds-num">163</div><div class="ds-pct">40.5%</div></div>
+        <div class="ds-item ds-MU"><div class="ds-lbl">Mua</div><div class="ds-num">32</div><div class="ds-pct">8.0%</div></div>
+        <div class="ds-item ds-A"><div class="ds-lbl">Chờ bán</div><div class="ds-num">123</div><div class="ds-pct">30.6%</div></div>
+        <div class="ds-item ds-R"><div class="ds-lbl">Bán</div><div class="ds-num">84</div><div class="ds-pct">20.9%</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ COUNTDOWN ══════════ -->
+<div class="countdown-section">
+  <div class="countdown-label">Web StockTraders AI chính thức ra mắt 02/08/2026 — còn</div>
+  <div class="countdown">
+    <div class="cd-unit"><span class="cd-num" id="cd-d">20</span><div class="cd-lbl">Ngày</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><span class="cd-num" id="cd-h">00</span><div class="cd-lbl">Giờ</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><span class="cd-num" id="cd-m">00</span><div class="cd-lbl">Phút</div></div>
+    <div class="cd-sep">:</div>
+    <div class="cd-unit"><span class="cd-num" id="cd-s">00</span><div class="cd-lbl">Giây</div></div>
+  </div>
+  <div class="launch-note">Đăng ký ngay hôm nay — <strong>khoá ưu đãi 50%</strong> trước khi hết hạn</div>
+</div>
+
+<!-- ══════════ DATA NUMBERS ══════════ -->
+<section class="reveal">
+  <div class="section-eyebrow">Dữ liệu không đối thủ</div>
+  <div class="section-title">Con số nói thay<br>lời quảng cáo</div>
+  <p class="section-sub">Không có hệ thống nào trên thị trường Việt cung cấp chiều sâu lịch sử và độ bao phủ như StockTraders AI.</p>
+
+  <div class="data-moat">
+    <div class="dm-card c-G">
+      <div class="dm-num">10</div>
+      <div class="dm-unit">năm lịch sử chân sóng</div>
+      <div class="dm-desc">Toàn bộ chu kỳ thị trường từ 2015 đến nay. AI học từ hàng trăm chân sóng thực tế để nhận diện mẫu hình.</div>
+    </div>
+    <div class="dm-card c-B">
+      <div class="dm-num">5</div>
+      <div class="dm-unit">năm dữ liệu SMDT & dòng tiền</div>
+      <div class="dm-desc">Truy xuất lịch sử dòng tiền ngành, dòng tiền cổ phiếu, SMDT ngành & mã — 60 tháng đầy đủ.</div>
+    </div>
+    <div class="dm-card c-A">
+      <div class="dm-num">402</div>
+      <div class="dm-unit">cổ phiếu theo dõi</div>
+      <div class="dm-desc">Toàn bộ HOSE + HNX, phân loại theo 49 ngành, cập nhật tín hiệu Chờ mua / Mua / Chờ bán / Bán mỗi phiên.</div>
+    </div>
+    <div class="dm-card c-R">
+      <div class="dm-num">49</div>
+      <div class="dm-unit">ngành được phân tích</div>
+      <div class="dm-desc">6 ngành chủ lực + 43 ngành phụ. Radar dòng tiền liên ngành giúp phát hiện vốn đang luân chuyển đi đâu.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ PROOF — LỊCH SỬ CHÂN SÓNG ══════════ -->
+<section class="reveal">
+  <div class="section-eyebrow">Bằng chứng thực tế</div>
+  <div class="section-title">Hệ thống đã báo trước<br>mọi chân sóng lớn</div>
+  <p class="section-sub">Tín hiệu Chờ mua xuất hiện đúng đáy, trước khi thị trường hồi phục — không chỉ ở VN-Index, mà còn ở từng ngành và từng mã qua Dòng tiền ngành, SMDT ngành và SMDT mã. Đây không phải backtest — đây là lịch sử thực tế hệ thống đã phát tín hiệu.</p>
+
+  <!-- 6 dòng ngành chủ lực -->
+  <div style="background:var(--surf);border:.5px solid var(--bdr);border-radius:14px;padding:20px 24px;margin-top:24px">
+    <div style="font-size:13px;font-weight:700;color:var(--t3);margin-bottom:12px">
+      Phương pháp luận: dẫn sóng thị trường chỉ đến từ <span style="color:var(--A)">6 dòng ngành chủ lực</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <span style="padding:6px 14px;border-radius:20px;background:var(--Gs);color:var(--G);border:.5px solid var(--Gb);font-size:12.5px;font-weight:700">Chứng khoán</span>
+      <span style="padding:6px 14px;border-radius:20px;background:var(--Bs);color:var(--B);border:.5px solid var(--Bb);font-size:12.5px;font-weight:700">Ngân hàng</span>
+      <span style="padding:6px 14px;border-radius:20px;background:var(--As);color:var(--A);border:.5px solid var(--Ab);font-size:12.5px;font-weight:700">BĐS Dân cư</span>
+      <span style="padding:6px 14px;border-radius:20px;background:var(--Gs);color:var(--G);border:.5px solid var(--Gb);font-size:12.5px;font-weight:700">Xây dựng</span>
+      <span style="padding:6px 14px;border-radius:20px;background:var(--As);color:var(--A);border:.5px solid var(--Ab);font-size:12.5px;font-weight:700">Thép</span>
+      <span style="padding:6px 14px;border-radius:20px;background:var(--Rs);color:var(--R);border:.5px solid var(--Rb);font-size:12.5px;font-weight:700">Sóng ngành Vin</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--t2);line-height:1.6;margin-top:12px">
+      Lộ trình dẫn sóng chỉ ghi nhận một ngành là "dẫn sóng" khi SMDT vượt ngưỡng 70% và thuộc 1 trong 6 dòng chủ lực này — loại bỏ nhiễu từ hàng trăm ngành phụ, giúp tập trung đúng vào dòng tiền lớn đang vận động.
+    </div>
+  </div>
+
+  <!-- Highlight event: April 9 -->
+  <div class="event-card" style="margin-top:16px">
+    <div>
+      <div class="event-badge">Sự kiện nổi bật · Đã xác minh</div>
+      <div class="event-title">09/04/2025 — Hệ thống báo Chờ mua khi VN-Index tạo đáy 1.073,61 điểm</div>
+      <div class="event-body">
+        Hệ thống ghi nhận <strong style="color:var(--t1)">231 mã Chờ mua</strong> tăng đột biến, phát cảnh báo "Khả năng tạo đáy mới — giải ngân thăm dò 30%". Ngành <strong style="color:var(--t1)">Chứng khoán là ngành DUY NHẤT vượt ngưỡng SMDT 70%</strong> (đạt 71,87%) ngay tại đáy — dẫn đầu bởi <strong style="color:var(--t1)">VND (88,73%), HCM (86,15%), SSI (84,09%)</strong>. Sang phiên 10/04, 175 mã chuyển trạng thái Mua (gấp 17 lần), độ tin cậy sóng đạt 82%.
+      </div>
+      <div style="margin-top:14px;padding:12px 16px;background:var(--Gs);border:.5px solid var(--Gb);border-radius:10px;font-size:13px;color:var(--t1)">
+        📈 Trong gần 1 năm sau đó, VN-Index đi từ <strong>1.073,61 → 1.918,46 điểm</strong> — tương đương <strong style="color:var(--G)">+844 điểm (+79%)</strong>, chu kỳ tăng giá lớn nhất thị trường Việt Nam hậu đại dịch.
+      </div>
+    </div>
+    <div class="event-stats">
+      <div class="es-item">
+        <div class="es-num" style="color:var(--G)">231</div>
+        <div class="es-lbl">Mã Chờ mua</div>
+      </div>
+      <div class="es-item">
+        <div class="es-num" style="color:var(--A)">71,87%</div>
+        <div class="es-lbl">SMDT Chứng khoán</div>
+      </div>
+      <div class="es-item">
+        <div class="es-num" style="color:var(--B)">82%</div>
+        <div class="es-lbl">Tin cậy</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highlight event: Dòng tiền ngành 28/05 -->
+  <div class="event-card" style="background:linear-gradient(135deg,#150B33,#0A1A2F);border-color:var(--Bb)">
+    <div>
+      <div class="event-badge" style="background:var(--B)">Case study · Dòng tiền ngành & SMDT</div>
+      <div class="event-title" style="color:var(--B)">28/05 — Chứng khoán bắt đầu dẫn sóng với SMDT đạt 73,3%</div>
+      <div class="event-body">
+        Suốt cả tháng 6, <strong style="color:var(--t1)">Chứng khoán là dòng ngành duy nhất dẫn sóng</strong> trong 6 nhóm chủ lực — đó là lý do các mã vốn hoá nhỏ ngành CK như <strong style="color:var(--t1)">CTS, FTS, BVS, ORS, VND</strong> đồng loạt tăng phi mã đúng lúc thị trường chung còn nghi ngờ.
+      </div>
+    </div>
+    <div class="event-stats">
+      <div class="es-item">
+        <div class="es-num" style="color:var(--B)">73,3%</div>
+        <div class="es-lbl">SMDT ngành</div>
+      </div>
+      <div class="es-item">
+        <div class="es-num" style="color:var(--B)">1/6</div>
+        <div class="es-lbl">Dòng chủ lực</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highlight event: Xây dựng 07/07 + 3 dòng dẫn sóng tháng 7 -->
+  <div class="event-card" style="background:linear-gradient(135deg,#0B2313,#0A1A2F);border-color:var(--Gb)">
+    <div>
+      <div class="event-badge" style="background:var(--G);color:#04140B">Case study · Lộ trình dẫn sóng</div>
+      <div class="event-title" style="color:var(--G)">07/07 — Xây dựng dẫn sóng trở lại với SMDT vọt lên 84,9%</div>
+      <div class="event-body">
+        Đây là lần thứ <strong style="color:var(--t1)">5 trong năm</strong> ngành Xây dựng vượt ngưỡng SMDT 70% (gần nhất trước đó là 08/05 với 71,9%). Sang tháng 7, thị trường ghi nhận <strong style="color:var(--t1)">3 dòng cùng lúc tham gia dẫn sóng</strong>: Vin, Chứng khoán và Xây dựng — dòng tiền đang luân chuyển liên tục giữa các nhóm ngành chủ lực.
+      </div>
+    </div>
+    <div class="event-stats">
+      <div class="es-item">
+        <div class="es-num" style="color:var(--G)">84,9%</div>
+        <div class="es-lbl">SMDT ngành</div>
+      </div>
+      <div class="es-item">
+        <div class="es-num" style="color:var(--G)">3</div>
+        <div class="es-lbl">Dòng dẫn sóng T7</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Highlight event: Sóng Dầu khí 2025 - mã mạnh đi trước ngành -->
+  <div class="event-card" style="background:linear-gradient(135deg,#2B1607,#0A1A2F);border-color:var(--Ab)">
+    <div>
+      <div class="event-badge" style="background:var(--A);color:#2B1607">Case study · Mã mạnh đi trước ngành mạnh</div>
+      <div class="event-title" style="color:var(--A)">Sóng Dầu khí cuối 2025 — BSR báo hiệu trước cả ngành 1 phiên</div>
+      <div class="event-body">
+        16/12/2025: SMDT cổ phiếu <strong style="color:var(--t1)">BSR vọt lên 87,51%</strong> — sớm hơn ngành đúng 1 phiên. Đến 17/12, SMDT ngành <strong style="color:var(--t1)">Sản xuất & Khai thác Dầu khí mới đạt 78,68%</strong>, chính thức xác nhận ngành mạnh. PLX theo sau, đạt chuẩn mã mạnh ngày 24/12 với SMDT 74,97%. Hệ thống gửi cảnh báo tận nơi: <em>"Cổ phiếu BSR có SMDT đạt 70%"</em> — trước khi đa số nhà đầu tư kịp để ý.
+      </div>
+    </div>
+    <div class="event-stats">
+      <div class="es-item">
+        <div class="es-num" style="color:var(--A)">87,51%</div>
+        <div class="es-lbl">SMDT BSR</div>
+      </div>
+      <div class="es-item">
+        <div class="es-num" style="color:var(--A)">1 phiên</div>
+        <div class="es-lbl">Đi trước ngành</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pull-quote: dòng tiền bên trong vs vẻ ngoài chỉ số -->
+  <div class="bonus-card" style="margin-top:16px;background:linear-gradient(135deg,#150B33,#0B0F2E);border-color:var(--Bb)">
+    <div class="bonus-ic" style="background:var(--B);color:#fff"><i class="ti ti-sparkles"></i></div>
+    <div>
+      <div class="bonus-title">"Dòng tiền luôn đi trước giá. Ngành luôn đi trước chỉ số."</div>
+      <div class="bonus-desc">Từ đáy <strong style="color:var(--t1)">1.780 điểm</strong>, chỉ trong hơn 1 tháng biến động, VN-Index đã có lúc tăng lên mốc <strong style="color:var(--G)">1.894 điểm</strong> — trong khi nhiều nhà đầu tư còn nghi ngờ vùng đáy, hệ thống đã ghi nhận nhiều ngành có SMDT vượt trên 70%, báo trước dòng tiền đang âm thầm tích luỹ.</div>
+    </div>
+  </div>
+
+  <!-- Table lịch sử -->
+  <div class="proof">
+    <div class="proof-header">
+      <div>
+        <div class="proof-title"><i class="ti ti-history" style="margin-right:8px;color:var(--B)"></i>Lịch sử chân sóng tiêu biểu — 10 năm gần nhất</div>
+        <div class="proof-subtitle">Chỉ hiển thị các chân sóng đã hoàn thành & được xác nhận. Dữ liệu đầy đủ sau khi kích hoạt 02/08/2026.</div>
+      </div>
+      <div style="font-size:11px;color:var(--t4);font-weight:600">Truy xuất 10 năm · Premium only</div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="proof-table">
+        <thead>
+          <tr>
+            <th>Ngày tạo đáy</th>
+            <th>VN-Index đáy</th>
+            <th>Độ tin cậy</th>
+            <th>Điểm tăng</th>
+            <th>Biến động</th>
+            <th>Loại sóng</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="td-date">09/04/2025</td><td>1,073.61</td><td><span class="rel-badge">82%<span class="rb-bar"><span class="rb-fill" style="width:82%"></span></span></span></td><td class="td-pts">+844đ</td><td class="td-pct">+79%</td><td><span class="tag-wave tag-big">Sóng lớn</span></td></tr>
+          <tr><td class="td-date">20/02/2026</td><td>1,202.57</td><td><span class="rel-badge">76%<span class="rb-bar"><span class="rb-fill" style="width:76%"></span></span></span></td><td class="td-pts">+251đ</td><td class="td-pct">+20.84%</td><td><span class="tag-wave tag-big">Sóng lớn</span></td></tr>
+          <tr><td class="td-date">10/01/2026</td><td>1,158.23</td><td><span class="rel-badge">71%<span class="rb-bar"><span class="rb-fill" style="width:71%"></span></span></span></td><td class="td-pts">+185đ</td><td class="td-pct">+15.99%</td><td><span class="tag-wave tag-med">Sóng hồi</span></td></tr>
+          <tr><td class="td-date">12/11/2025</td><td>1,198.47</td><td><span class="rel-badge">73%<span class="rb-bar"><span class="rb-fill" style="width:73%"></span></span></span></td><td class="td-pts">+182đ</td><td class="td-pct">+15.21%</td><td><span class="tag-wave tag-med">Sóng hồi</span></td></tr>
+          <tr><td class="td-date">19/09/2025</td><td>1,265.11</td><td><span class="rel-badge">68%<span class="rb-bar"><span class="rb-fill" style="width:68%"></span></span></span></td><td class="td-pts">+215đ</td><td class="td-pct">+16.91%</td><td><span class="tag-wave tag-med">Sóng hồi</span></td></tr>
+          <tr>
+            <td colspan="6" style="text-align:center;padding:16px;color:var(--t4);font-size:12px">
+              <i class="ti ti-lock" style="margin-right:6px"></i>
+              +47 chân sóng khác từ 2015 — mở khóa với gói Premium
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ FEATURES ══════════ -->
+<section id="features" class="reveal">
+  <div class="section-eyebrow">Tính năng</div>
+  <div class="section-title">Bộ công cụ đầy đủ<br>cho nhà đầu tư chuyên nghiệp</div>
+
+  <div class="features-grid">
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--Gs)"><i class="ti ti-wave-sine" style="color:var(--G)"></i></div>
+      <div class="feat-title">Dò sóng thị trường AI</div>
+      <div class="feat-desc">Vòng tròn 4 trạng thái — Chờ mua · Mua · Chờ bán · Bán — cập nhật mỗi phiên. Kèm chỉ số Độ tin cậy và Nhật ký tín hiệu tự động.</div>
+      <div class="feat-tag" style="background:var(--Gs);color:var(--G);border:.5px solid var(--Gb)">Lịch sử 10 năm</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--Bs)"><i class="ti ti-building-community" style="color:var(--B)"></i></div>
+      <div class="feat-title">Dòng tiền ngành & SMDT Ngành</div>
+      <div class="feat-desc">Theo dõi tín hiệu Đổ vào / Nhen nhóm / Thoát ra / Thoát liên tiếp trên 49 ngành. Heatmap SMDT ngành truy xuất 5 năm.</div>
+      <div class="feat-tag" style="background:var(--Bs);color:var(--B);border:.5px solid var(--Bb)">Lịch sử 5 năm</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--As)"><i class="ti ti-chart-line" style="color:var(--A)"></i></div>
+      <div class="feat-title">Dòng tiền cổ phiếu & SMDT Mã</div>
+      <div class="feat-desc">402 mã phân loại 4 nhóm dòng tiền. Heatmap SMDT từng mã theo ngày, lọc theo ngành, xuất Excel.</div>
+      <div class="feat-tag" style="background:var(--As);color:var(--A);border:.5px solid var(--Ab)">Lịch sử 5 năm</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--Rs)"><i class="ti ti-star" style="color:var(--R)"></i></div>
+      <div class="feat-title">Top cổ phiếu mạnh</div>
+      <div class="feat-desc">Danh sách mã có SMDT ≥ 70%, đúng sóng đúng ngành. Cập nhật cuối phiên, tích hợp cảnh báo dòng tiền.</div>
+      <div class="feat-tag" style="background:var(--Rs);color:var(--R);border:.5px solid var(--Rb)">Realtime</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:rgba(192,132,252,.1)"><i class="ti ti-sparkles" style="color:#C084FC"></i></div>
+      <div class="feat-title">AI Advisor & Nhật ký tín hiệu</div>
+      <div class="feat-desc">Khuyến nghị được tạo tự động từ AI mỗi phiên: nhận diện pha thị trường, gợi ý chiến lược giải ngân theo từng tình huống.</div>
+      <div class="feat-tag" style="background:rgba(192,132,252,.1);color:#C084FC;border:.5px solid rgba(192,132,252,.3)">AI · Tự động</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--elev)"><i class="ti ti-device-mobile" style="color:var(--t2)"></i></div>
+      <div class="feat-title">App mobile + Web dashboard</div>
+      <div class="feat-desc">Trải nghiệm đồng nhất trên điện thoại và máy tính. Gói Premium dùng chung 1 tài khoản — đăng ký trên app là dùng được ngay bản Web Dashboard đầy đủ tính năng, không cần mua thêm gói riêng.</div>
+      <div class="feat-tag" style="background:var(--Gs);color:var(--G);border:.5px solid var(--Gb)">1 tài khoản · App & Web</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--Bs)"><i class="ti ti-clipboard-check" style="color:var(--B)"></i></div>
+      <div class="feat-title">Phân tích danh mục AI</div>
+      <div class="feat-desc">Nhập tối đa 15 mã đang nắm giữ, chỉ sau <strong style="color:var(--t1)">30 giây</strong> AI chấm Điểm phù hợp /100 và phân loại 4 nhóm: Đúng sóng-Đúng ngành, Đúng sóng-Sai ngành, Đúng ngành-Sai sóng, Sai cả hai.</div>
+      <div class="feat-tag" style="background:var(--Bs);color:var(--B);border:.5px solid var(--Bb)">AI chấm điểm /100</div>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon" style="background:var(--Gs)"><i class="ti ti-timeline" style="color:var(--G)"></i></div>
+      <div class="feat-title">Lộ trình dẫn sóng ngành</div>
+      <div class="feat-desc">Timeline trực quan theo tháng, đánh dấu mọi lần ngành vượt ngưỡng SMDT 70% và 100% — giúp nhận diện ngành nào đang dẫn dắt dòng tiền trước thị trường.</div>
+      <div class="feat-tag" style="background:var(--Gs);color:var(--G);border:.5px solid var(--Gb)">Theo dõi 49 ngành</div>
+    </div>
+  </div>
+
+  <!-- Dẫn chứng thật: Phân tích danh mục -->
+  <div class="bonus-card" style="margin-top:14px">
+    <div class="bonus-ic"><i class="ti ti-check"></i></div>
+    <div>
+      <div class="bonus-title">Ví dụ thực tế từ hệ thống</div>
+      <div class="bonus-desc">Danh mục <strong style="color:var(--t1)">MSR · GAS · BSR · DIG · HDG</strong> được AI chấm <strong style="color:var(--G)">100/100 điểm phù hợp</strong> — 100% đúng sóng đúng ngành, nhận xét: "Danh mục mạnh, duy trì và theo dõi tín hiệu bán."</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════ PRICING ══════════ -->
+<section id="pricing" class="reveal" style="text-align:center">
+  <div class="section-eyebrow">Ưu đãi ra mắt</div>
+  <div class="section-title">Khoá giá ngay — trước 02/08/2026</div>
+  <p class="section-sub" style="margin:0 auto 0">Đăng ký hôm nay để giữ mức giá ưu đãi. Hệ thống kích hoạt chính thức ngày 02/08/2026.</p>
+
+  <div class="pricing-wrap">
+    <!-- Gói thường -->
+    <div class="price-card">
+      <div class="price-label">Giá thông thường</div>
+      <div class="price-val" style="color:var(--t3)">8.860.000</div>
+      <div class="price-period">đồng / tháng</div>
+      <div class="price-features">
+        <div class="pf"><i class="ti ti-check"></i>Dò sóng thị trường</div>
+        <div class="pf"><i class="ti ti-check"></i>Dòng tiền ngành & mã</div>
+        <div class="pf"><i class="ti ti-check"></i>Bảng SMDT ngành & mã</div>
+        <div class="pf" style="color:var(--t4)"><i class="ti ti-x" style="color:var(--t4)"></i>Lịch sử chân sóng 10 năm</div>
+        <div class="pf" style="color:var(--t4)"><i class="ti ti-x" style="color:var(--t4)"></i>Dữ liệu 5 năm</div>
+        <div class="pf" style="color:var(--t4)"><i class="ti ti-x" style="color:var(--t4)"></i>Truy cập Web Dashboard</div>
+      </div>
+      <button class="price-btn price-btn-secondary">Giá hiện tại</button>
+    </div>
+
+    <!-- Gói ưu đãi -->
+    <div class="price-card featured">
+      <div class="featured-badge">⚡ Ưu đãi</div>
+      <div class="price-label">Đăng ký trước 02/08</div>
+      <div class="price-orig">8.860.000 đ/tháng</div>
+      <div class="price-val">4.430.000</div>
+      <div class="price-period">đồng / tháng · Giảm 50%</div>
+      <div class="price-saving"><i class="ti ti-tag" style="font-size:13px"></i>Tiết kiệm 4.430.000đ mỗi tháng</div>
+      <div class="price-features">
+        <div class="pf"><i class="ti ti-check"></i>Toàn bộ tính năng Premium</div>
+        <div class="pf"><i class="ti ti-check"></i>Lịch sử chân sóng <strong>10 năm</strong></div>
+        <div class="pf"><i class="ti ti-check"></i>Dữ liệu SMDT & dòng tiền <strong>5 năm</strong></div>
+        <div class="pf"><i class="ti ti-check"></i>AI Advisor cá nhân hoá</div>
+        <div class="pf"><i class="ti ti-check"></i>Cảnh báo dòng tiền realtime</div>
+        <div class="pf"><i class="ti ti-check"></i>Web Dashboard đầy đủ <strong>đi kèm gói Premium</strong></div>
+      </div>
+      <button class="price-btn price-btn-primary" onclick="document.getElementById('register').scrollIntoView({behavior:'smooth'})">
+        <i class="ti ti-bolt" style="font-size:14px"></i>Đăng ký ưu đãi ngay
+      </button>
+    </div>
+  </div>
+
+  <!-- Bonus note -->
+  <div class="bonus-card" style="margin-top:16px">
+    <div class="bonus-ic"><i class="ti ti-gift"></i></div>
+    <div>
+      <div class="bonus-title">💻 Web Dashboard đầy đủ tính năng — dùng chung tài khoản Premium</div>
+      <div class="bonus-desc">Đăng ký gói Premium (trên app), tài khoản của bạn dùng được ngay bản Web Dashboard với đầy đủ 9 module phân tích — Dò sóng, SMDT, Dòng tiền ngành, Top cổ phiếu mạnh — tối ưu cho màn hình lớn. Đây là tính năng thuộc gói Premium, không phải bản dùng thử miễn phí; cần tài khoản Premium đang hoạt động để sử dụng. <strong style="color:var(--t1)">Web chính thức ra mắt ngày 02/08/2026.</strong></div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;font-size:12px;color:var(--t4);line-height:1.7">
+    * Phân tích và dữ liệu chỉ mang tính chất tham khảo, không phải khuyến nghị đầu tư.<br>
+    Nhà đầu tư tự chịu trách nhiệm với quyết định của mình.
+  </div>
+</section>
+
+<!-- ══════════ REGISTER FORM ══════════ -->
+</main>
+<div class="form-section" id="register">
+  <div class="form-wrap">
+    <div class="section-eyebrow" style="text-align:center">Đăng ký ưu đãi</div>
+    <div class="section-title" style="font-size:clamp(22px,4vw,36px)">Khoá giá 50%<br>trước 02/08/2026</div>
+    <p style="font-size:14px;color:var(--t3);margin-top:10px">Điền thông tin, đội ngũ sẽ liên hệ xác nhận và hướng dẫn kích hoạt.</p>
+
+    <div class="form-box">
+      <div class="form-row">
+        <label class="form-label">Họ và tên *</label>
+        <input class="form-input" id="lead-name" type="text" placeholder="Nguyễn Văn A">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Số điện thoại *</label>
+        <input class="form-input" id="lead-phone" type="tel" placeholder="0901 234 567">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Email</label>
+        <input class="form-input" id="lead-email" type="email" placeholder="email@example.com">
+      </div>
+      <div id="form-error" style="display:none;color:var(--R);font-size:12.5px;margin-bottom:10px"></div>
+      <button class="form-submit" id="form-submit-btn" onclick="handleSubmit(event)">
+        <i class="ti ti-bolt" style="font-size:15px"></i>
+        Đăng ký nhận ưu đãi 50%
+      </button>
+      <div class="form-note">
+        Bằng cách đăng ký, bạn đồng ý nhận thông tin về StockTraders AI.<br>
+        Chúng tôi không chia sẻ thông tin của bạn với bên thứ ba.<br>
+        <a href="#">Chính sách bảo mật</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ ADMIN — QUẢN LÝ KHÁCH ĐĂNG KÝ (ẩn, kích hoạt từ footer) ══════════ -->
+<div class="form-section" id="admin-panel" style="padding-top:0;display:none">
+  <div class="form-wrap" style="max-width:920px">
+    <div id="admin-login" style="display:none;max-width:340px;margin:16px auto 0;background:var(--surf);border:.5px solid var(--bdr);border-radius:14px;padding:20px">
+      <div style="font-size:13px;color:var(--t2);margin-bottom:10px">Nhập mã truy cập để xem danh sách khách đăng ký</div>
+      <input id="admin-pin" type="password" placeholder="Mã PIN" style="width:100%;background:var(--elev);border:.5px solid var(--bdr);border-radius:8px;padding:10px 12px;color:var(--t1);font-size:14px;margin-bottom:10px" onkeydown="if(event.key==='Enter')adminLogin()">
+      <button onclick="adminLogin()" style="width:100%;background:var(--B);color:#fff;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer">Truy cập</button>
+      <div id="admin-login-err" style="display:none;color:var(--R);font-size:12px;margin-top:8px">Sai mã PIN, vui lòng thử lại.</div>
+    </div>
+
+    <div id="admin-dash" style="display:none;margin-top:16px;background:var(--surf);border:.5px solid var(--bdr);border-radius:14px;padding:20px;overflow-x:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:700">Danh sách khách đăng ký <span id="admin-count" style="color:var(--t3);font-weight:400">(0)</span></div>
+        <div style="display:flex;gap:8px">
+          <button onclick="loadLeads()" style="background:var(--elev);border:.5px solid var(--bdr);color:var(--t2);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer"><i class="ti ti-refresh" style="font-size:12px"></i> Làm mới</button>
+          <button onclick="exportLeadsCSV()" style="background:var(--Gs);border:.5px solid var(--Gb);color:var(--G);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer"><i class="ti ti-download" style="font-size:12px"></i> Xuất CSV</button>
+          <button onclick="closeAdmin()" style="background:none;border:.5px solid var(--bdr);color:var(--t3);border-radius:8px;padding:7px 12px;font-size:12.5px;cursor:pointer">Đóng</button>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px" id="admin-table">
+        <thead>
+          <tr style="text-align:left;color:var(--t3);border-bottom:.5px solid var(--bdr)">
+            <th style="padding:8px 10px">Thời gian</th>
+            <th style="padding:8px 10px">Họ tên</th>
+            <th style="padding:8px 10px">SĐT</th>
+            <th style="padding:8px 10px">Email</th>
+            <th style="padding:8px 10px"></th>
+          </tr>
+        </thead>
+        <tbody id="admin-tbody">
+          <tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px;font-size:11.5px;color:var(--t4)">
+        * Dữ liệu lưu trong SQLite leads.db của app Python. PIN chỉ dùng để xem nhanh danh sách nội bộ.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ FOOTER ══════════ -->
+<footer>
+  <div class="footer-brand">
+    <div class="nav-ic" style="width:28px;height:28px;border-radius:7px"><svg width="15" height="13" viewBox="0 0 230 200" xmlns="http://www.w3.org/2000/svg"><path fill="#fff" d="M200.55,88.45c-5.85,0-10.73,0-14.65,0V55.43h-5.59v33.02c-4.27,0-7.44,0-10.26,0v0h-2.83v69.72c14.44-11.38,25.23-27.56,30.35-45.74C199.65,106.04,200.55,94.97,200.55,88.45z"/><path fill="#fff" d="M115.23,55.43V22.28h-5.59v33.14h-13.6v40.74l-0.21,79.39c6.85,1.54,16.41,1.63,16.41,1.63c5.02,0,11.31-0.54,16.37-1.47l0.22-79.54V55.43H115.23z"/><path fill="#fff" d="M151.02,110.37V77.02h-5.59v33.35h-13.6v44.28v20.4c10.99-2.49,21.93-7.03,32.79-14.97v-5.43v-44.28H151.02z"/><path fill="#fff" d="M79.39,77.02V44.44h-5.6l-0.07,32.58H60.2v51.56v31.25c9.04,6.84,21.26,12.58,32.76,15.12l0.02-46.37V77.02H79.39z"/><path fill="#fff" d="M43.63,33.45V0.51h-5.59v32.93h-13.6v36.24v14.26v9.01c1.31,25.93,13.82,49.22,32.79,64.53v-87.8V33.45H43.63z"/><path fill="#fff" d="M112.61,180.69c-50.58,0-91.65-40.71-92.26-91.15h0v-0.18c-0.01-0.32-0.03-0.64-0.03-0.96c0-0.32,0.02-0.63,0.03-0.96v-54C9.21,50.63,2.71,66.39,2.71,88.4c0,60.69,49.2,109.9,109.9,109.9c60.7,0,109.9-49.21,109.9-109.9h-17.6C204.91,139.37,163.58,180.69,112.61,180.69z"/></svg></div>
+    StockTraders AI
+  </div>
+  <div onclick="toggleAdmin()" style="cursor:default;user-select:none">© 2026 StockTraders · Hoạt động từ 2013 · Dữ liệu HOSE + HNX</div>
+  <div style="font-size:11px;color:var(--t4);max-width:380px;text-align:right;line-height:1.6">
+    Dữ liệu và phân tích chỉ mang tính chất tham khảo. Không phải khuyến nghị đầu tư.
+  </div>
+</footer>
+
+
+<script>
+  const ADMIN_PIN = "9983";
+  let leadsCache = [];
+  let adminUnlocked = false;
+  function setEditStatus(message, isError = false) {
+    const el = document.getElementById("edit-status");
+    if (!el) return;
+    el.textContent = message || "";
+    el.style.color = isError ? "var(--R)" : "var(--G)";
+  }
+
+  function getEditableArea() {
+    return document.getElementById("editable-area");
+  }
+
+  function removeEditControls(root = document) {
+    root.querySelectorAll(".section-edit-actions").forEach((el) => el.remove());
+    root.querySelectorAll("[data-edit-section]").forEach((el) => el.removeAttribute("data-edit-section"));
+    root.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+  }
+
+  function prepareEditableSections() {
+    const area = getEditableArea();
+    if (!area || !area.classList.contains("edit-mode")) return;
+    area.querySelectorAll(".section-edit-actions").forEach((el) => el.remove());
+
+    Array.from(area.children).forEach((section) => {
+      if (section.classList.contains("section-edit-actions")) return;
+      section.setAttribute("data-edit-section", "1");
+
+      const actions = document.createElement("div");
+      actions.className = "section-edit-actions";
+      actions.setAttribute("contenteditable", "false");
+      actions.innerHTML = `
+        <button type="button" onclick="moveEditableSection(this, -1)">↑</button>
+        <button type="button" onclick="moveEditableSection(this, 1)">↓</button>
+        <button type="button" onclick="duplicateEditableSection(this)">Nhân bản</button>
+        <button type="button" onclick="removeEditableSection(this)">Xoá</button>
+      `;
+      section.prepend(actions);
+    });
+  }
+
+  async function loadEditableContent() {
+    const area = getEditableArea();
+    if (!area) return;
+    try {
+      const data = await requestJson("", { apiBase: "/api/page-content" });
+      if (data?.html && String(data.html).trim()) {
+        area.innerHTML = data.html;
+      }
+    } catch (err) {
+      console.error("Không tải được nội dung UI đã lưu:", err);
+    }
+  }
+
+  function enableEditMode() {
+    const area = getEditableArea();
+    const toolbar = document.getElementById("edit-toolbar");
+    if (!area || !toolbar) return;
+    toolbar.style.display = "flex";
+    area.classList.add("edit-mode");
+    area.setAttribute("contenteditable", "true");
+    prepareEditableSections();
+    setEditStatus("Đang sửa. Bấm trực tiếp vào chữ để đổi nội dung.");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function disableEditMode() {
+    const area = getEditableArea();
+    const toolbar = document.getElementById("edit-toolbar");
+    if (!area || !toolbar) return;
+    removeEditControls(area);
+    area.classList.remove("edit-mode");
+    area.removeAttribute("contenteditable");
+    toolbar.style.display = "none";
+  }
+
+  function cleanEditableHtml() {
+    const area = getEditableArea();
+    const clone = area.cloneNode(true);
+    removeEditControls(clone);
+    clone.classList.remove("edit-mode");
+    clone.removeAttribute("id");
+    return clone.innerHTML.trim();
+  }
+
+  async function saveEditableContent() {
+    try {
+      setEditStatus("Đang lưu...");
+      await requestJson("", {
+        apiBase: "/api/page-content",
+        method: "POST",
+        body: JSON.stringify({ html: cleanEditableHtml() }),
+      });
+      prepareEditableSections();
+      setEditStatus("Đã lưu UI.");
+    } catch (err) {
+      console.error("Không lưu được UI:", err);
+      setEditStatus("Không lưu được UI. Kiểm tra server.", true);
+    }
+  }
+
+  async function resetEditableContent() {
+    if (!confirm("Reset phần UI phía trên form về mẫu ban đầu?")) return;
+    try {
+      await requestJson("", { apiBase: "/api/page-content", method: "DELETE" });
+      location.reload();
+    } catch (err) {
+      console.error("Không reset được UI:", err);
+      setEditStatus("Không reset được UI.", true);
+    }
+  }
+
+  function addEditableSection() {
+    const area = getEditableArea();
+    if (!area) return;
+    const section = document.createElement("section");
+    section.className = "reveal vis custom-edit-section";
+    section.innerHTML = `
+      <div class="section-eyebrow">Section mới</div>
+      <div class="section-title">Tiêu đề mới</div>
+      <p class="section-sub">Bấm trực tiếp vào chữ để chỉnh nội dung. Có thể dán HTML bằng nút trên thanh sửa.</p>
+    `;
+    area.appendChild(section);
+    prepareEditableSections();
+    section.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function removeEditableSection(button) {
+    const section = button.closest("[data-edit-section]");
+    if (section && confirm("Xoá section này?")) section.remove();
+  }
+
+  function duplicateEditableSection(button) {
+    const section = button.closest("[data-edit-section]");
+    if (!section) return;
+    const copy = section.cloneNode(true);
+    removeEditControls(copy);
+    section.after(copy);
+    prepareEditableSections();
+  }
+
+  function moveEditableSection(button, direction) {
+    const section = button.closest("[data-edit-section]");
+    if (!section) return;
+    if (direction < 0 && section.previousElementSibling) {
+      section.parentNode.insertBefore(section, section.previousElementSibling);
+    }
+    if (direction > 0 && section.nextElementSibling) {
+      section.parentNode.insertBefore(section.nextElementSibling, section);
+    }
+    prepareEditableSections();
+  }
+
+  function openHtmlPaste() {
+    document.getElementById("html-paste-modal").style.display = "grid";
+    document.getElementById("paste-html-input").focus();
+  }
+
+  function closeHtmlPaste() {
+    document.getElementById("html-paste-modal").style.display = "none";
+  }
+
+  function findMatchingBrace(css, openIndex) {
+    let depth = 0;
+    for (let i = openIndex; i < css.length; i += 1) {
+      if (css[i] === "{") depth += 1;
+      if (css[i] === "}") {
+        depth -= 1;
+        if (depth === 0) return i;
+      }
+    }
+    return -1;
+  }
+
+  function scopeCssSelector(selector, scopeSelector) {
+    const trimmed = selector.trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith(scopeSelector)) return trimmed;
+    if (trimmed === "*") return scopeSelector + " *";
+    if (/^(html|body|:root)(\b|(?=[.#:\[]|$))/i.test(trimmed)) {
+      return trimmed.replace(/^(html|body|:root)/i, scopeSelector);
+    }
+    return scopeSelector + " " + trimmed;
+  }
+
+  function splitCssSelectors(selectorText) {
+    const selectors = [];
+    let current = "";
+    let depth = 0;
+    for (const ch of selectorText) {
+      if (ch === "(" || ch === "[") depth += 1;
+      if (ch === ")" || ch === "]") depth = Math.max(0, depth - 1);
+      if (ch === "," && depth === 0) {
+        selectors.push(current);
+        current = "";
+      } else {
+        current += ch;
+      }
+    }
+    if (current.trim()) selectors.push(current);
+    return selectors;
+  }
+
+  function scopeCss(css, scopeSelector) {
+    let source = String(css || "").replace(/\/\*[\s\S]*?\*\//g, "");
+    let output = "";
+    let i = 0;
+
+    while (i < source.length) {
+      const nextOpen = source.indexOf("{", i);
+      if (nextOpen === -1) {
+        output += source.slice(i);
+        break;
+      }
+
+      const head = source.slice(i, nextOpen).trim();
+      const close = findMatchingBrace(source, nextOpen);
+      if (close === -1) break;
+      const body = source.slice(nextOpen + 1, close);
+
+      if (!head) {
+        i = close + 1;
+        continue;
+      }
+
+      if (/^@media/i.test(head) || /^@supports/i.test(head)) {
+        output += `${head}{${scopeCss(body, scopeSelector)}}`;
+      } else if (/^@(keyframes|font-face|import|charset|property)/i.test(head)) {
+        output += `${head}{${body}}`;
+      } else if (head.startsWith("@")) {
+        output += `${head}{${body}}`;
+      } else {
+        const scopedSelectors = splitCssSelectors(head)
+          .map((selector) => scopeCssSelector(selector, scopeSelector))
+          .filter(Boolean)
+          .join(", ");
+        if (scopedSelectors) output += `${scopedSelectors}{${body}}`;
+      }
+      i = close + 1;
+    }
+
+    return output;
+  }
+
+  function extractHtmlForEditableArea(rawHtml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, "text/html");
+    const hasDocumentShell = /<!doctype|<html[\s>]|<head[\s>]|<body[\s>]/i.test(rawHtml);
+    const scopeClass = "pasted-ui-" + Date.now().toString(36);
+    const scopeSelector = "." + scopeClass + " .pasted-document";
+    const styles = [];
+    let container;
+
+    if (hasDocumentShell) {
+      doc.querySelectorAll("style").forEach((style) => styles.push(style.textContent || ""));
+      container = doc.body || doc.documentElement;
+    } else {
+      container = document.createElement("div");
+      container.innerHTML = rawHtml;
+      container.querySelectorAll("style").forEach((style) => {
+        styles.push(style.textContent || "");
+        style.remove();
+      });
+    }
+
+    container.querySelectorAll("script, link, meta, title, base").forEach((el) => el.remove());
+    const bodyHtml = container.innerHTML.trim();
+    const scopedCss = styles.length ? scopeCss(styles.join("\n"), scopeSelector) : "";
+    const layoutGuard = `${scopeSelector}{min-height:auto!important;width:100%!important;max-width:100%!important;} ${scopeSelector} *{max-width:100%;}`;
+    const scopedStyle = `<style>${scopedCss}${layoutGuard}</style>`;
+    return `<section class="custom-pasted-section ${scopeClass}">${scopedStyle}<div class="pasted-document">${bodyHtml}</div></section>`;
+  }
+
+  function applyPastedHtml(mode) {
+    const area = getEditableArea();
+    const input = document.getElementById("paste-html-input");
+    const html = input.value.trim();
+    if (!area || !html) return;
+    if (mode === "replace" && !confirm("Thay toàn bộ UI phía trên form bằng HTML vừa dán?")) return;
+
+    const filteredHtml = extractHtmlForEditableArea(html);
+    if (mode === "replace") area.innerHTML = filteredHtml;
+    if (mode === "append") area.insertAdjacentHTML("beforeend", filteredHtml);
+
+    input.value = "";
+    closeHtmlPaste();
+    prepareEditableSections();
+    setEditStatus("Đã lọc HTML và dán vào section riêng. Bấm Lưu UI để áp dụng cho mọi người.");
+  }
+
+  const escapeHtml = (s) =>
+    String(s || "").replace(/[&<>"']/g, (c) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    }[c]));
+
+  const requestJson = async (path = "", options = {}) => {
+    const apiBase = options.apiBase || "/api/leads";
+    const finalOptions = { ...options };
+    delete finalOptions.apiBase;
+    const res = await fetch(apiBase + path, {
+      headers: { "Content-Type": "application/json", ...(finalOptions.headers || {}) },
+      ...finalOptions,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(data?.error || `Lỗi kết nối API (${res.status})`);
+    return data;
+  };
+
+  const renderLeads = (leads) => {
+    const tbody = document.getElementById("admin-tbody");
+    const countEl = document.getElementById("admin-count");
+    if (!tbody || !countEl) return;
+
+    countEl.textContent = "(" + leads.length + ")";
+    if (leads.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Chưa có khách đăng ký nào.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = leads.map((l) => {
+      const d = new Date(l.ts);
+      const dateStr = isNaN(d) ? "" : d.toLocaleString("vi-VN");
+      return `<tr style="border-bottom:.5px solid var(--bdr)">
+        <td style="padding:9px 10px;color:var(--t3);white-space:nowrap">${dateStr}</td>
+        <td style="padding:9px 10px;color:var(--t1);font-weight:600">${escapeHtml(l.name)}</td>
+        <td style="padding:9px 10px">${escapeHtml(l.phone)}</td>
+        <td style="padding:9px 10px;color:var(--t2)">${escapeHtml(l.email || "-")}</td>
+        <td style="padding:9px 10px;text-align:right"><button onclick="deleteLead('${l.id}')" style="background:none;border:none;color:var(--R);cursor:pointer;font-size:12px"><i class="ti ti-trash"></i></button></td>
+      </tr>`;
+    }).join("");
+  };
+
+  async function loadLeads() {
+    const tbody = document.getElementById("admin-tbody");
+    if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>';
+    try {
+      const data = await requestJson();
+      leadsCache = Array.isArray(data.leads) ? data.leads : [];
+      renderLeads(leadsCache);
+    } catch (err) {
+      console.error("Không tải được leads từ API:", err);
+      if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được API lưu đăng ký.</td></tr>';
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    const btn = document.getElementById("form-submit-btn");
+    const errBox = document.getElementById("form-error");
+    const name = document.getElementById("lead-name").value.trim();
+    const phone = document.getElementById("lead-phone").value.trim();
+    const email = document.getElementById("lead-email").value.trim();
+
+    errBox.style.display = "none";
+    if (!name || !phone) {
+      errBox.textContent = "Vui lòng nhập đầy đủ Họ tên và Số điện thoại.";
+      errBox.style.display = "block";
+      return;
+    }
+
+    btn.disabled = true;
+    const originalHTML = btn.innerHTML;
+    btn.innerHTML = "Đang gửi...";
+
+    try {
+      const data = await requestJson("", {
+        method: "POST",
+        body: JSON.stringify({ name, phone, email }),
+      });
+      if (data?.lead) leadsCache = [data.lead, ...leadsCache];
+    } catch (err) {
+      console.error("Lưu đăng ký vào API thất bại:", err);
+      errBox.textContent = "⚠️ Không thể lưu đăng ký. Vui lòng kiểm tra server đang chạy.";
+      errBox.style.display = "block";
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      return;
+    }
+
+    btn.innerHTML = '<i class="ti ti-check" style="font-size:15px"></i> Đã nhận đăng ký — Đội ngũ sẽ liên hệ sớm!';
+    btn.style.background = "var(--MU)";
+    btn.style.cursor = "default";
+  }
+
+  function closeAdmin() {
+    document.getElementById("admin-panel").style.display = "none";
+    document.getElementById("admin-login").style.display = "none";
+    document.getElementById("admin-dash").style.display = "none";
+    document.getElementById("admin-pin").value = "";
+  }
+
+  function toggleAdmin() {
+    const panel = document.getElementById("admin-panel");
+    const login = document.getElementById("admin-login");
+    const dash = document.getElementById("admin-dash");
+    const isHidden = panel.style.display === "none";
+    if (isHidden) {
+      panel.style.display = "block";
+      if (adminUnlocked) {
+        dash.style.display = "block";
+        loadLeads();
+      enableEditMode();
+      } else {
+        login.style.display = "block";
+      }
+      setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+    } else {
+      closeAdmin();
+    }
+  }
+
+  function adminLogin() {
+    const pin = document.getElementById("admin-pin").value.trim();
+    const err = document.getElementById("admin-login-err");
+    if (pin === ADMIN_PIN) {
+      adminUnlocked = true;
+      document.getElementById("admin-login").style.display = "none";
+      document.getElementById("admin-dash").style.display = "block";
+      err.style.display = "none";
+      loadLeads();
+      enableEditMode();
+    } else {
+      err.style.display = "block";
+    }
+  }
+
+  async function deleteLead(id) {
+    if (!confirm("Xoá khách đăng ký này?")) return;
+    try {
+      await requestJson("/" + encodeURIComponent(id), { method: "DELETE" });
+      leadsCache = leadsCache.filter((l) => l.id !== id);
+      renderLeads(leadsCache);
+    } catch (err) {
+      console.error("Không xoá được lead từ API:", err);
+      alert("Không xoá được, vui lòng kiểm tra server rồi thử lại.");
+    }
+  }
+
+  function exportLeadsCSV() {
+    if (leadsCache.length === 0) {
+      alert("Chưa có dữ liệu để xuất.");
+      return;
+    }
+    const header = ["Thời gian", "Họ tên", "Số điện thoại", "Email"];
+    const rows = leadsCache.map((l) => [
+      new Date(l.ts).toLocaleString("vi-VN"),
+      l.name || "",
+      l.phone || "",
+      l.email || "",
+    ]);
+    const csv = [header, ...rows]
+      .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
+      .join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "stocktraders_leads_" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function updateCountdown() {
+    const launch = new Date("2026-08-02T00:00:00+07:00");
+    const now = new Date();
+    const diff = launch - now;
+    const dEl = document.getElementById("cd-d");
+    const hEl = document.getElementById("cd-h");
+    const mEl = document.getElementById("cd-m");
+    const sEl = document.getElementById("cd-s");
+    if (!dEl) return;
+    if (diff <= 0) {
+      dEl.textContent = hEl.textContent = mEl.textContent = sEl.textContent = "00";
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    dEl.textContent = String(d).padStart(2, "0");
+    hEl.textContent = String(h).padStart(2, "0");
+    mEl.textContent = String(m).padStart(2, "0");
+    sEl.textContent = String(s).padStart(2, "0");
+  }
+
+  document.addEventListener("DOMContentLoaded", async () => {
+    await loadEditableContent();
+    updateCountdown();
+    setInterval(updateCountdown, 1000);
+
+    const obs = new IntersectionObserver((entries) => {
+      entries.forEach((e) => {
+        if (e.isIntersecting) e.target.classList.add("vis");
+      });
+    }, { threshold: 0.12 });
+    document.querySelectorAll(".reveal").forEach((el) => obs.observe(el));
+
+    const circles = document.querySelectorAll("#hero-donut circle:not(:first-child)");
+    let angle = 0;
+    setInterval(() => {
+      angle += 0.08;
+      circles.forEach((c) => {
+        c.setAttribute("style", `transform:rotate(${-90 + angle * 0.3}deg);transform-origin:80px 80px`);
+      });
+    }, 50);
+
+    const wrap = document.querySelector(".donut-wrap");
+    let scale = 1;
+    let dir = 0.0003;
+    setInterval(() => {
+      if (!wrap) return;
+      scale += dir;
+      if (scale > 1.008 || scale < 1) dir *= -1;
+      wrap.style.transform = `scale(${scale})`;
+    }, 30);
+  });
+</script>
+  </body>
+</html>
