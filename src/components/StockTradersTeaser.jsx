@@ -388,7 +388,7 @@ const BODY_HTML = `
       <div class="proof-lbl">Ngành được theo dõi dòng tiền mỗi ngày</div>
     </div>
     <div class="proof-item">
-      <div class="proof-num" style="color:var(--t1)">3+ năm</div>
+      <div class="proof-num" style="color:var(--t1)">10+ năm</div>
       <div class="proof-lbl">Vận hành cùng nhà đầu tư thực chiến</div>
     </div>
   </div>
