@@ -8,10 +8,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 5174,
-    proxy: {
-      '/api': 'http://localhost:5010',
-      '/ra-mat-web-2026/api': 'http://localhost:5010'
-    }
+    port: 5174
   }
 })
