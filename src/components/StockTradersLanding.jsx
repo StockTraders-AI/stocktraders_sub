@@ -15,14 +15,11 @@ import { useEffect, useRef } from "react";
     JS thật trong component, gắn vào window.* để các thuộc tính onclick="..."
     nằm trong HTML string ở trên có thể gọi tới (giữ đúng hành vi bản gốc).
 
-  ⚠️ LƯU Ý QUAN TRỌNG VỀ LƯU TRỮ DỮ LIỆU:
-  window.storage (dùng để lưu khách đăng ký + đọc trong admin panel) là API
-  riêng của môi trường preview Claude — KHÔNG tồn tại khi deploy component
-  này lên website/app React thật của bạn. Khi đó form sẽ tự hiện cảnh báo
-  "không lưu được" thay vì âm thầm báo thành công giả. Trước khi dùng thật,
-  hãy thay phần gọi window.storage trong handleSubmit/loadLeads/deleteLead
-  bằng API backend thật của bạn (REST endpoint, Firebase, Supabase, Google
-  Sheets webhook, CRM...).
+  LƯU Ý VỀ LƯU TRỮ DỮ LIỆU:
+  Form đăng ký lưu trực tiếp vào localStorage của trình duyệt để dùng ngay
+  mà không cần backend. Dữ liệu chỉ nằm trên đúng thiết bị/trình duyệt đang
+  mở website; nếu đổi máy, đổi trình duyệt, dùng ẩn danh hoặc xóa dữ liệu
+  site thì danh sách đăng ký sẽ không còn.
 
   Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
   đây chỉ là rào chắn phía client, không phải bảo mật thực sự).
@@ -968,7 +965,7 @@ const BODY_HTML = `
         </tbody>
       </table>
       <div style="margin-top:12px;font-size:11.5px;color:var(--t4)">
-        * Dữ liệu lưu trong artifact storage, chỉ là bản demo — khi triển khai thật cần kết nối CRM/backend riêng và cơ chế đăng nhập bảo mật hơn mã PIN.
+        * Dữ liệu đang lưu trong localStorage của trình duyệt này. Có thể xuất CSV để sao lưu hoặc chuyển sang hệ thống khác khi cần.
       </div>
     </div>
   </div>
@@ -1018,6 +1015,19 @@ export default function StockTradersLanding() {
     });
 
     const ADMIN_PIN = "260726"; // demo PIN — đổi khi triển khai thật
+    const LEADS_STORAGE_KEY = "stocktraders:leads";
+
+    const readStoredLeads = () => {
+      const raw = window.localStorage.getItem(LEADS_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    };
+
+    const writeStoredLeads = (leads) => {
+      window.localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leads));
+    };
+
 
     const escapeHtml = (s) =>
       String(s).replace(/[&<>"']/g, (c) => ({
@@ -1059,32 +1069,14 @@ export default function StockTradersLanding() {
       if (!tbody) return;
       tbody.innerHTML =
         '<tr><td colspan="6" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>';
-      if (typeof window.storage === "undefined") {
-        tbody.innerHTML =
-          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">⚠️ window.storage không khả dụng trong môi trường này — cần nối backend thật để lưu/đọc dữ liệu.</td></tr>';
-        return;
-      }
       try {
-        const listRes = await window.storage.list("lead:", true);
-        const keys = listRes?.keys || [];
-        const leads = [];
-        for (const k of keys) {
-          try {
-            const res = await window.storage.get(k, true);
-            if (res?.value) leads.push({ key: k, ...JSON.parse(res.value) });
-          } catch (e) {
-            /* skip broken entry */
-          }
-        }
-        leads.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        const leads = readStoredLeads().sort((a, b) => new Date(b.ts) - new Date(a.ts));
         leadsCacheRef.current = leads;
         renderLeads(leads);
       } catch (err) {
-        console.error("Không tải được leads:", err);
+        console.error("Không tải được leads từ localStorage:", err);
         tbody.innerHTML =
-          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không tải được dữ liệu: ' +
-          (err?.message || "lỗi không xác định") +
-          "</td></tr>";
+          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không đọc được dữ liệu đã lưu trên trình duyệt này. Vui lòng kiểm tra quyền lưu trữ của trình duyệt.</td></tr>';
       }
     };
 
@@ -1104,27 +1096,22 @@ export default function StockTradersLanding() {
         return;
       }
 
-      if (typeof window.storage === "undefined") {
-        errBox.textContent =
-          "⚠️ Không thể lưu: component này đang chạy ngoài môi trường preview Claude nên window.storage không tồn tại. Hãy nối backend thật trước khi dùng production.";
-        errBox.style.display = "block";
-        return;
-      }
-
       btn.disabled = true;
       const originalHTML = btn.innerHTML;
       btn.innerHTML = "Đang gửi...";
 
-      const lead = { name, phone, email, exp, ts: new Date().toISOString() };
       const key = "lead:" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      const lead = { key, name, phone, email, exp, ts: new Date().toISOString() };
 
       try {
-        const res = await window.storage.set(key, JSON.stringify(lead), true);
-        if (!res) throw new Error("storage.set trả về null");
+        const leads = readStoredLeads();
+        leads.unshift(lead);
+        writeStoredLeads(leads);
+        leadsCacheRef.current = leads;
       } catch (err) {
-        console.error("Lưu đăng ký thất bại:", err);
+        console.error("Lưu đăng ký vào localStorage thất bại:", err);
         errBox.textContent =
-          "⚠️ Lưu thất bại (" + (err?.message || "lỗi không xác định") + "). Vui lòng thử lại.";
+          "⚠️ Không thể lưu trên trình duyệt này. Vui lòng bật quyền lưu dữ liệu site hoặc thử lại bằng trình duyệt khác.";
         errBox.style.display = "block";
         btn.disabled = false;
         btn.innerHTML = originalHTML;
@@ -1180,10 +1167,12 @@ export default function StockTradersLanding() {
     const deleteLead = async (key) => {
       if (!confirm("Xoá khách đăng ký này?")) return;
       try {
-        await window.storage.delete(key, true);
-        leadsCacheRef.current = leadsCacheRef.current.filter((l) => l.key !== key);
-        renderLeads(leadsCacheRef.current);
+        const leads = readStoredLeads().filter((l) => l.key !== key);
+        writeStoredLeads(leads);
+        leadsCacheRef.current = leads;
+        renderLeads(leads);
       } catch (err) {
+        console.error("Không xoá được lead từ localStorage:", err);
         alert("Không xoá được, vui lòng thử lại.");
       }
     };
