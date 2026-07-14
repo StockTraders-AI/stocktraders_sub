@@ -18,7 +18,7 @@ import { useEffect, useRef } from "react";
 
   Dữ liệu teaser được tách riêng với danh sách khách đăng ký mua ở component StockTradersLanding.
 
-  Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật).
+  Mã PIN admin demo: 9983 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật).
 */
 
 const CSS = `
@@ -495,7 +495,7 @@ export default function StockTradersTeaser() {
       }
     });
 
-    const ADMIN_PIN = "260726"; // demo PIN — đổi khi triển khai thật
+    const ADMIN_PIN = "9983"; // demo PIN — đổi khi triển khai thật
     const API_BASE = "/api/teaser-leads";
 
     const requestJson = async (path = "", options = {}) => {
