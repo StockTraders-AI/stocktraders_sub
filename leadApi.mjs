@@ -1,4 +1,4 @@
-﻿import { mkdir } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 
@@ -28,6 +28,15 @@ const getDb = async () => {
       ts TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_teaser_leads_ts ON teaser_leads(ts DESC);
+
+    CREATE TABLE IF NOT EXISTS tri_an_leads (
+      key TEXT PRIMARY KEY,
+      name TEXT DEFAULT '',
+      phone TEXT NOT NULL,
+      email TEXT DEFAULT '',
+      ts TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_tri_an_leads_ts ON tri_an_leads(ts DESC);
   `);
   return db;
 };
@@ -40,7 +49,7 @@ const readJsonBody = (req) =>
     req.on("data", (chunk) => {
       body += chunk;
       if (body.length > 1024 * 1024) {
-        reject(new Error("Payload quá lớn"));
+        reject(new Error("Payload quÃ¡ lá»›n"));
         req.destroy();
       }
     });
@@ -48,7 +57,7 @@ const readJsonBody = (req) =>
       try {
         resolve(body ? JSON.parse(body) : {});
       } catch {
-        reject(new Error("JSON không hợp lệ"));
+        reject(new Error("JSON khÃ´ng há»£p lá»‡"));
       }
     });
     req.on("error", reject);
@@ -78,7 +87,7 @@ const handleMainLeads = async (req, res, database, url) => {
     const exp = cleanValue(input.exp);
 
     if (!name || !phone) {
-      sendJson(res, 400, { error: "Vui lòng nhập họ tên và số điện thoại." });
+      sendJson(res, 400, { error: "Vui lÃ²ng nháº­p há» tÃªn vÃ  sá»‘ Ä‘iá»‡n thoáº¡i." });
       return true;
     }
 
@@ -125,7 +134,7 @@ const handleTeaserLeads = async (req, res, database, url) => {
     const email = cleanValue(input.email);
 
     if (!phone) {
-      sendJson(res, 400, { error: "Vui lòng nhập số điện thoại." });
+      sendJson(res, 400, { error: "Vui lÃ²ng nháº­p sá»‘ Ä‘iá»‡n thoáº¡i." });
       return true;
     }
 
@@ -155,6 +164,51 @@ const handleTeaserLeads = async (req, res, database, url) => {
   return false;
 };
 
+const handleTriAnLeads = async (req, res, database, url) => {
+  if (url.pathname === "/api/tri-an-leads" && req.method === "GET") {
+    const leads = database
+      .prepare("SELECT key, name, phone, email, ts FROM tri_an_leads ORDER BY ts DESC")
+      .all();
+    sendJson(res, 200, { leads });
+    return true;
+  }
+
+  if (url.pathname === "/api/tri-an-leads" && req.method === "POST") {
+    const input = await readJsonBody(req);
+    const name = cleanValue(input.name);
+    const phone = cleanValue(input.phone);
+    const email = cleanValue(input.email);
+
+    if (!phone) {
+      sendJson(res, 400, { error: "Vui lÃ²ng nháº­p sá»‘ Ä‘iá»‡n thoáº¡i." });
+      return true;
+    }
+
+    const lead = {
+      key: "tri_an_lead:" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+      name,
+      phone,
+      email,
+      ts: new Date().toISOString(),
+    };
+
+    database
+      .prepare("INSERT INTO tri_an_leads (key, name, phone, email, ts) VALUES (?, ?, ?, ?, ?)")
+      .run(lead.key, lead.name, lead.phone, lead.email, lead.ts);
+
+    sendJson(res, 201, { lead });
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/tri-an-leads/") && req.method === "DELETE") {
+    const key = decodeURIComponent(url.pathname.slice("/api/tri-an-leads/".length));
+    database.prepare("DELETE FROM tri_an_leads WHERE key = ?").run(key);
+    sendJson(res, 200, { ok: true });
+    return true;
+  }
+
+  return false;
+};
 export const handleLeadApi = async (req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
   const database = await getDb();
@@ -167,9 +221,10 @@ export const handleLeadApi = async (req, res) => {
 
   if (await handleMainLeads(req, res, database, url)) return true;
   if (await handleTeaserLeads(req, res, database, url)) return true;
+  if (await handleTriAnLeads(req, res, database, url)) return true;
 
   if (url.pathname.startsWith("/api/")) {
-    sendJson(res, 404, { error: "API không tồn tại." });
+    sendJson(res, 404, { error: "API khÃ´ng tá»“n táº¡i." });
     return true;
   }
 
