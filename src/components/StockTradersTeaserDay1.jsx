@@ -1,31 +1,11 @@
 import { useEffect, useRef } from "react";
 
 /*
-  StockTraders AI — Teaser Ngày 1: Lời cảm ơn (React component)
-  ----------------------------------------------------------------
-  Cùng cách chuyển đổi như StockTradersTeaser.jsx / StockTradersLanding.jsx:
-  - CSS gốc giữ nguyên 100%, nhúng qua <style>.
-  - Layout tĩnh (nav, hero tri ân, timeline 2013-2026, 4 vòng tròn dò sóng
-    lịch sử, form đăng ký, footer, admin panel) giữ nguyên dưới dạng HTML
-    string, render qua dangerouslySetInnerHTML.
-  - Phần tương tác (đếm ngược, form đăng ký nhận thông báo, admin panel) là
-    hàm JS thật trong component, gắn ra window.* để onclick="..." trong HTML
-    tĩnh gọi được.
-
-  ⚠️ window.storage (lưu người đăng ký + admin panel) chỉ tồn tại trong môi
-  trường preview Claude. Khi deploy component này lên web thật, cần thay
-  bằng backend thật trong handleSubmit/loadLeads/deleteLead — form sẽ tự
-  báo lỗi rõ ràng thay vì báo thành công giả khi window.storage không tồn tại.
-
-  Dữ liệu trang này lưu ở prefix "teaser_lead:" — CHUNG với StockTradersTeaser.jsx
-  (cùng chiến dịch teaser 19 ngày, khác trang bán hàng chính "lead:").
-
-  Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật).
-
-  Số liệu 4 vòng tròn dò sóng lịch sử (HD981 2014, Covid-19 2020, Vạn Thịnh
-  Phát 2022, 09/04/2025): các điểm đáy VN-Index và số 231 mã Chờ mua là số
-  liệu thật đã được xác minh; riêng tỷ trọng 4 trạng thái (Chờ mua/Mua/Chờ
-  bán/Bán) bên trong mỗi vòng tròn mang tính minh hoạ.
+  StockTraders AI - Teaser Ngày 1: Lời cảm ơn.
+  Layout/CSS giữ theo file mẫu. Form đăng ký của /tri-an gửi dữ liệu về
+  API /api/tri-an-leads, server Node lưu vào SQLite info.db bảng tri_an_leads.
+  Dữ liệu /tri-an tách riêng với /sap-ra-mat và trang bán hàng chính.
+  Mã PIN admin demo: 9983.
 */
 
 const CSS = `
@@ -497,7 +477,18 @@ export default function StockTradersTeaserDay1() {
       }
     });
 
-    const ADMIN_PIN = "9983"; // demo PIN — đổi khi triển khai thật
+    const ADMIN_PIN = "9983"; // demo PIN - đổi khi triển khai thật
+    const API_BASE = "/api/tri-an-leads";
+
+    const requestJson = async (path = "", options = {}) => {
+      const res = await fetch(API_BASE + path, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || `Lỗi kết nối API (${res.status})`);
+      return data;
+    };
 
     const escapeHtml = (s) =>
       String(s).replace(/[&<>"']/g, (c) => ({
@@ -524,9 +515,9 @@ export default function StockTradersTeaserDay1() {
           const dateStr = isNaN(d) ? "" : d.toLocaleString("vi-VN");
           return `<tr style="border-bottom:.5px solid var(--bdr)">
       <td style="padding:9px 10px;color:var(--t3);white-space:nowrap">${dateStr}</td>
-      <td style="padding:9px 10px;color:var(--t1);font-weight:600">${escapeHtml(l.name || "—")}</td>
+      <td style="padding:9px 10px;color:var(--t1);font-weight:600">${escapeHtml(l.name || "-")}</td>
       <td style="padding:9px 10px">${escapeHtml(l.phone || "")}</td>
-      <td style="padding:9px 10px;color:var(--t2)">${escapeHtml(l.email || "—")}</td>
+      <td style="padding:9px 10px;color:var(--t2)">${escapeHtml(l.email || "-")}</td>
       <td style="padding:9px 10px;text-align:right"><button onclick="deleteLead('${l.key}')" style="background:none;border:none;color:var(--R);cursor:pointer;font-size:12px"><i class="ti ti-trash"></i></button></td>
     </tr>`;
         })
@@ -538,32 +529,15 @@ export default function StockTradersTeaserDay1() {
       if (!tbody) return;
       tbody.innerHTML =
         '<tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>';
-      if (typeof window.storage === "undefined") {
-        tbody.innerHTML =
-          '<tr><td colspan="5" style="padding:20px 10px;color:var(--R);text-align:center">⚠️ window.storage không khả dụng trong môi trường này — cần nối backend thật để lưu/đọc dữ liệu.</td></tr>';
-        return;
-      }
       try {
-        const listRes = await window.storage.list("teaser_lead:", true);
-        const keys = listRes?.keys || [];
-        const leads = [];
-        for (const k of keys) {
-          try {
-            const res = await window.storage.get(k, true);
-            if (res?.value) leads.push({ key: k, ...JSON.parse(res.value) });
-          } catch (e) {
-            /* skip broken entry */
-          }
-        }
-        leads.sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        const data = await requestJson();
+        const leads = Array.isArray(data?.leads) ? data.leads : [];
         leadsCacheRef.current = leads;
         renderLeads(leads);
       } catch (err) {
-        console.error("Không tải được leads:", err);
+        console.error("Không tải được leads từ API:", err);
         tbody.innerHTML =
-          '<tr><td colspan="5" style="padding:20px 10px;color:var(--R);text-align:center">Không tải được dữ liệu: ' +
-          (err?.message || "lỗi không xác định") +
-          "</td></tr>";
+          '<tr><td colspan="5" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được API lưu đăng ký.</td></tr>';
       }
     };
 
@@ -582,27 +556,20 @@ export default function StockTradersTeaserDay1() {
         return;
       }
 
-      if (typeof window.storage === "undefined") {
-        errBox.textContent =
-          "⚠️ Không thể lưu: component này đang chạy ngoài môi trường preview Claude nên window.storage không tồn tại. Hãy nối backend thật trước khi dùng production.";
-        errBox.style.display = "block";
-        return;
-      }
-
       btn.disabled = true;
       const originalHTML = btn.innerHTML;
       btn.innerHTML = "Đang gửi...";
 
-      const lead = { name, phone, email, ts: new Date().toISOString() };
-      const key = "teaser_lead:" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-
       try {
-        const res = await window.storage.set(key, JSON.stringify(lead), true);
-        if (!res) throw new Error("storage.set trả về null");
+        const data = await requestJson("", {
+          method: "POST",
+          body: JSON.stringify({ name, phone, email }),
+        });
+        if (data?.lead) leadsCacheRef.current = [data.lead, ...leadsCacheRef.current];
       } catch (err) {
-        console.error("Lưu đăng ký thất bại:", err);
+        console.error("Lưu đăng ký vào API thất bại:", err);
         errBox.textContent =
-          "⚠️ Lưu thất bại (" + (err?.message || "lỗi không xác định") + "). Vui lòng thử lại.";
+          "⚠️ Không thể lưu đăng ký. Vui lòng kiểm tra server đang chạy.";
         errBox.style.display = "block";
         btn.disabled = false;
         btn.innerHTML = originalHTML;
@@ -610,7 +577,7 @@ export default function StockTradersTeaserDay1() {
       }
 
       btn.innerHTML =
-        '<i class="ti ti-check" style="font-size:15px"></i> Đã đăng ký — Hẹn gặp bạn 02/08!';
+        '<i class="ti ti-check" style="font-size:15px"></i> Đã đăng ký - Hẹn gặp bạn 02/08!';
       btn.style.background = "var(--MU)";
       btn.style.color = "#fff";
       btn.style.cursor = "default";
@@ -643,7 +610,7 @@ export default function StockTradersTeaserDay1() {
     };
 
     const adminLogin = () => {
-      const pin = document.getElementById("admin-pin").value;
+      const pin = document.getElementById("admin-pin").value.trim();
       const err = document.getElementById("admin-login-err");
       if (pin === ADMIN_PIN) {
         adminUnlockedRef.current = true;
@@ -659,11 +626,12 @@ export default function StockTradersTeaserDay1() {
     const deleteLead = async (key) => {
       if (!confirm("Xoá đăng ký này?")) return;
       try {
-        await window.storage.delete(key, true);
+        await requestJson("/" + encodeURIComponent(key), { method: "DELETE" });
         leadsCacheRef.current = leadsCacheRef.current.filter((l) => l.key !== key);
         renderLeads(leadsCacheRef.current);
       } catch (err) {
-        alert("Không xoá được, vui lòng thử lại.");
+        console.error("Không xoá được lead từ API:", err);
+        alert("Không xoá được, vui lòng kiểm tra server rồi thử lại.");
       }
     };
 
@@ -687,12 +655,10 @@ export default function StockTradersTeaserDay1() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "stocktraders_teaser_leads_" + new Date().toISOString().slice(0, 10) + ".csv";
+      a.download = "stocktraders_tri_an_leads_" + new Date().toISOString().slice(0, 10) + ".csv";
       a.click();
       URL.revokeObjectURL(url);
     };
-
-    /* Gắn ra window để các onclick="..." trong HTML tĩnh gọi được */
     window.handleSubmit = handleSubmit;
     window.toggleAdmin = toggleAdmin;
     window.adminLogin = adminLogin;
