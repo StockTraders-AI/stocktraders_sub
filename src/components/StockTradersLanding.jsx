@@ -16,10 +16,10 @@ import { useEffect, useRef } from "react";
     nằm trong HTML string ở trên có thể gọi tới (giữ đúng hành vi bản gốc).
 
   LƯU Ý VỀ LƯU TRỮ DỮ LIỆU:
-  Form đăng ký lưu trực tiếp vào localStorage của trình duyệt để dùng ngay
-  mà không cần backend. Dữ liệu chỉ nằm trên đúng thiết bị/trình duyệt đang
-  mở website; nếu đổi máy, đổi trình duyệt, dùng ẩn danh hoặc xóa dữ liệu
-  site thì danh sách đăng ký sẽ không còn.
+  Form đăng ký gửi dữ liệu về backend Node đơn giản qua /api/leads. Backend
+  lưu chung vào SQLite ở data/leads.sqlite trên server, nên các máy khác
+  cùng mở website từ server đó sẽ thấy cùng danh sách trong admin panel hoặc /hb.
+
 
   Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
   đây chỉ là rào chắn phía client, không phải bảo mật thực sự).
@@ -965,7 +965,7 @@ const BODY_HTML = `
         </tbody>
       </table>
       <div style="margin-top:12px;font-size:11.5px;color:var(--t4)">
-        * Dữ liệu đang lưu trong localStorage của trình duyệt này. Có thể xuất CSV để sao lưu hoặc chuyển sang hệ thống khác khi cần.
+        * Dữ liệu đang lưu trên SQLite backend chung của website. Mở /hb để xem nhanh ai đã gửi thông tin.
       </div>
     </div>
   </div>
@@ -1015,19 +1015,17 @@ export default function StockTradersLanding() {
     });
 
     const ADMIN_PIN = "260726"; // demo PIN — đổi khi triển khai thật
-    const LEADS_STORAGE_KEY = "stocktraders:leads";
+    const API_BASE = "/api";
 
-    const readStoredLeads = () => {
-      const raw = window.localStorage.getItem(LEADS_STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+    const requestJson = async (path, options = {}) => {
+      const res = await fetch(API_BASE + path, {
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || "Lỗi kết nối backend");
+      return data;
     };
-
-    const writeStoredLeads = (leads) => {
-      window.localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leads));
-    };
-
 
     const escapeHtml = (s) =>
       String(s).replace(/[&<>"']/g, (c) => ({
@@ -1070,13 +1068,14 @@ export default function StockTradersLanding() {
       tbody.innerHTML =
         '<tr><td colspan="6" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>';
       try {
-        const leads = readStoredLeads().sort((a, b) => new Date(b.ts) - new Date(a.ts));
+        const data = await requestJson("/leads");
+        const leads = Array.isArray(data?.leads) ? data.leads : [];
         leadsCacheRef.current = leads;
         renderLeads(leads);
       } catch (err) {
-        console.error("Không tải được leads từ localStorage:", err);
+        console.error("Không tải được leads từ backend:", err);
         tbody.innerHTML =
-          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không đọc được dữ liệu đã lưu trên trình duyệt này. Vui lòng kiểm tra quyền lưu trữ của trình duyệt.</td></tr>';
+          '<tr><td colspan="6" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được backend lưu đăng ký. Vui lòng kiểm tra server API đang chạy.</td></tr>';
       }
     };
 
@@ -1100,18 +1099,16 @@ export default function StockTradersLanding() {
       const originalHTML = btn.innerHTML;
       btn.innerHTML = "Đang gửi...";
 
-      const key = "lead:" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-      const lead = { key, name, phone, email, exp, ts: new Date().toISOString() };
-
       try {
-        const leads = readStoredLeads();
-        leads.unshift(lead);
-        writeStoredLeads(leads);
-        leadsCacheRef.current = leads;
+        const data = await requestJson("/leads", {
+          method: "POST",
+          body: JSON.stringify({ name, phone, email, exp }),
+        });
+        if (data?.lead) leadsCacheRef.current = [data.lead, ...leadsCacheRef.current];
       } catch (err) {
-        console.error("Lưu đăng ký vào localStorage thất bại:", err);
+        console.error("Lưu đăng ký vào backend thất bại:", err);
         errBox.textContent =
-          "⚠️ Không thể lưu trên trình duyệt này. Vui lòng bật quyền lưu dữ liệu site hoặc thử lại bằng trình duyệt khác.";
+          "⚠️ Không thể lưu đăng ký. Vui lòng kiểm tra backend đang chạy rồi thử lại.";
         errBox.style.display = "block";
         btn.disabled = false;
         btn.innerHTML = originalHTML;
@@ -1167,13 +1164,12 @@ export default function StockTradersLanding() {
     const deleteLead = async (key) => {
       if (!confirm("Xoá khách đăng ký này?")) return;
       try {
-        const leads = readStoredLeads().filter((l) => l.key !== key);
-        writeStoredLeads(leads);
-        leadsCacheRef.current = leads;
-        renderLeads(leads);
+        await requestJson("/leads/" + encodeURIComponent(key), { method: "DELETE" });
+        leadsCacheRef.current = leadsCacheRef.current.filter((l) => l.key !== key);
+        renderLeads(leadsCacheRef.current);
       } catch (err) {
-        console.error("Không xoá được lead từ localStorage:", err);
-        alert("Không xoá được, vui lòng thử lại.");
+        console.error("Không xoá được lead từ backend:", err);
+        alert("Không xoá được, vui lòng kiểm tra backend rồi thử lại.");
       }
     };
 
