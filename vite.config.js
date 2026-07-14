@@ -21,6 +21,7 @@ export default defineConfig({
   plugins: [leadApiPlugin(), react()],
   server: {
     host: '0.0.0.0',
-    port: 5174
+    port: 5174,
+    allowedHosts: ['landing.stocktradersai.vn']
   }
 })
