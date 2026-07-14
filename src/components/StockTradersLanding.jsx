@@ -1014,7 +1014,7 @@ export default function StockTradersLanding() {
       }
     });
 
-    const ADMIN_PIN = "260726"; // demo PIN — đổi khi triển khai thật
+    const ADMIN_PIN = "9983"; // demo PIN — đổi khi triển khai thật
     const API_BASE = "/api";
 
     const requestJson = async (path, options = {}) => {
