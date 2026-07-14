@@ -21,7 +21,7 @@ import { useEffect, useRef } from "react";
   © 2026 StockTraders ở footer và mã PIN bên dưới.
 
 
-  Mã PIN admin demo: 260726 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
+  Mã PIN admin demo: 9983 (đổi biến ADMIN_PIN bên dưới trước khi dùng thật;
   đây chỉ là rào chắn phía client, không phải bảo mật thực sự).
 */
 
@@ -1149,7 +1149,7 @@ export default function StockTradersLanding() {
     };
 
     const adminLogin = () => {
-      const pin = document.getElementById("admin-pin").value;
+      const pin = document.getElementById("admin-pin").value.trim();
       const err = document.getElementById("admin-login-err");
       if (pin === ADMIN_PIN) {
         adminUnlockedRef.current = true;
