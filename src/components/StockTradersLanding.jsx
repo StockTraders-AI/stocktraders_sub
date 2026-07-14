@@ -1015,8 +1015,7 @@ export default function StockTradersLanding() {
     });
 
     const ADMIN_PIN = "2026"; // demo PIN — đổi khi triển khai thật
-    const appBase = import.meta.env.BASE_URL.replace(/\/$/, "");
-    const API_BASE = (appBase || "") + "/api";
+    const API_BASE = "/api";
 
     const requestJson = async (path, options = {}) => {
       const res = await fetch(API_BASE + path, {

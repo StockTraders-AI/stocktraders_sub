@@ -10,7 +10,6 @@ const PORT = Number(process.env.PORT || 5174);
 const DATA_DIR = path.join(__dirname, "data");
 const DB_FILE = path.join(DATA_DIR, "leads.sqlite");
 const DIST_DIR = path.join(__dirname, "dist");
-const APP_BASE = normalizeBase(process.env.APP_BASE || "/ra-mat-web-2026");
 
 await mkdir(DATA_DIR, { recursive: true });
 const db = new DatabaseSync(DB_FILE);
@@ -26,22 +25,6 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_leads_ts ON leads(ts DESC);
 `);
 
-function normalizeBase(value) {
-  const base = String(value || "").trim();
-  if (!base || base === "/") return "";
-  return "/" + base.replace(/^\/+|\/+$/g, "");
-}
-
-function stripBase(pathname) {
-  if (!APP_BASE) return pathname;
-  if (pathname === APP_BASE) return "/";
-  if (pathname.startsWith(APP_BASE + "/")) return pathname.slice(APP_BASE.length) || "/";
-  return pathname;
-}
-
-function withBase(pathname) {
-  return APP_BASE ? APP_BASE + pathname : pathname;
-}
 
 const sendJson = (res, status, payload) => {
   res.writeHead(status, {
@@ -80,7 +63,7 @@ const listLeads = () =>
 
 const handleRoutes = async (req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
-  const routePath = stripBase(url.pathname);
+  const routePath = url.pathname;
 
   if (routePath === "/api/leads" && req.method === "GET") {
     sendJson(res, 200, { leads: listLeads() });
@@ -144,7 +127,7 @@ const contentTypes = {
 
 const serveStatic = async (req, res) => {
   const url = new URL(req.url, "http://" + (req.headers.host || "localhost"));
-  const requestedPath = decodeURIComponent(stripBase(url.pathname));
+  const requestedPath = decodeURIComponent(url.pathname);
   const safePath = requestedPath === "/" ? "/index.html" : requestedPath;
   const filePath = path.normalize(path.join(DIST_DIR, safePath));
 
@@ -161,7 +144,16 @@ const serveStatic = async (req, res) => {
       "Content-Type": contentTypes[path.extname(filePath)] || "application/octet-stream",
     });
     createReadStream(filePath).pipe(res);
+    return;
   } catch {
+    const hasFileExtension = path.extname(requestedPath) !== "";
+    const isAssetRequest = requestedPath.startsWith("/assets/");
+    if (hasFileExtension || isAssetRequest) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Static asset not found. Run npm run build and deploy the full dist folder.");
+      return;
+    }
+
     const fallback = path.join(DIST_DIR, "index.html");
     try {
       await stat(fallback);
@@ -183,5 +175,5 @@ createServer(async (req, res) => {
     sendJson(res, 500, { error: err.message || "Lỗi server" });
   }
 }).listen(PORT, "0.0.0.0", () => {
-  console.log("App running on http://localhost:" + PORT + withBase("/"));
+  console.log("App/API running on http://localhost:" + PORT);
 });
