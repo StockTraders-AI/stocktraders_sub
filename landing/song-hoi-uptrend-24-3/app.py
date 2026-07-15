@@ -22,10 +22,14 @@ def get_db():
             name TEXT NOT NULL,
             phone TEXT NOT NULL,
             email TEXT DEFAULT '',
+            capital TEXT DEFAULT '',
             ts TEXT NOT NULL
         )
         """
     )
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(leads)").fetchall()}
+    if "capital" not in columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN capital TEXT DEFAULT ''")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_ts ON leads(ts DESC)")
     return conn
 
@@ -61,7 +65,7 @@ def favicon():
 def list_leads():
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT id, name, phone, email, ts FROM leads ORDER BY ts DESC"
+            "SELECT id, name, phone, email, capital, ts FROM leads ORDER BY ts DESC"
         ).fetchall()
     return jsonify({"leads": [dict(row) for row in rows]})
 
@@ -72,23 +76,27 @@ def create_lead():
     name = clean(data.get("name"))
     phone = clean(data.get("phone"))
     email = clean(data.get("email"))
+    capital = clean(data.get("capital"))
 
-    if not name or not phone:
-        return jsonify({"error": "Vui lòng nhập họ tên và số điện thoại."}), 400
+    if not phone:
+        return jsonify({"error": "Vui lòng nhập số điện thoại."}), 400
+    if not name:
+        name = "—"
 
     lead = {
         "id": str(uuid.uuid4()),
         "name": name,
         "phone": phone,
         "email": email,
+        "capital": capital,
         "ts": datetime.now(timezone.utc).isoformat(),
     }
 
     with get_db() as conn:
         conn.execute(
             """
-            INSERT INTO leads (id, name, phone, email, ts)
-            VALUES (:id, :name, :phone, :email, :ts)
+            INSERT INTO leads (id, name, phone, email, capital, ts)
+            VALUES (:id, :name, :phone, :email, :capital, :ts)
             """,
             lead,
         )
