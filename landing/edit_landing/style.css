@@ -552,7 +552,9 @@ footer{
   width: min(100% - 40px, 1120px) !important;
   max-width: 1120px !important;
   min-height: auto !important;
-  margin: 80px auto !important;
+  margin: 40px auto !important;
+  padding-top: 24px !important;
+  padding-bottom: 24px !important;
   display: block !important;
   isolation: isolate;
   overflow: hidden;
@@ -565,7 +567,7 @@ footer{
   display: none !important;
 }
 .custom-edit-section {
-  padding: 80px 20px;
+  padding: 56px 20px;
 }
 @media (max-width: 720px) {
   .edit-toolbar { left: 8px; right: 8px; bottom: 8px; }
