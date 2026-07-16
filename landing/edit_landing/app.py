@@ -48,6 +48,20 @@ def db_file_for(slug):
     return DATA_DIR / f"{slug}.db"
 
 
+def landing_exists(slug):
+    slug = normalize_slug(slug)
+    if not is_valid_slug(slug):
+        return False
+    return slug in LEGACY_SLUGS or db_file_for(slug).exists()
+
+
+def require_landing(slug):
+    slug = validate_slug(slug)
+    if not landing_exists(slug):
+        abort(404)
+    return slug
+
+
 def clean(value):
     return str(value or "").strip()
 
@@ -444,7 +458,7 @@ def root():
 
 @app.get("/<slug>/")
 def index(slug):
-    validate_slug(slug)
+    require_landing(slug)
     return send_from_directory(BASE_DIR, "index.html")
 
 
@@ -455,7 +469,7 @@ def root_style():
 
 @app.get("/<slug>/style.css")
 def style(slug):
-    validate_slug(slug)
+    require_landing(slug)
     return send_from_directory(BASE_DIR, "style.css")
 
 
@@ -463,7 +477,7 @@ def style(slug):
 @app.get("/<slug>/favicon.jpg")
 def favicon(slug=None):
     if slug is not None:
-        validate_slug(slug)
+        require_landing(slug)
     file_path = BASE_DIR / "favicon.jpg"
     if file_path.exists():
         return send_from_directory(BASE_DIR, "favicon.jpg")
@@ -472,6 +486,7 @@ def favicon(slug=None):
 
 @app.get("/<slug>/api/page-content")
 def get_page_content(slug):
+    require_landing(slug)
     with get_db(slug) as conn:
         row = conn.execute("SELECT html, updated_at FROM page_content WHERE key = ?", ("editable_html",)).fetchone()
     if not row:
@@ -481,6 +496,7 @@ def get_page_content(slug):
 
 @app.post("/<slug>/api/page-content")
 def save_page_content(slug):
+    require_landing(slug)
     data = request.get_json(silent=True) or {}
     html = data.get("html")
     if not isinstance(html, str):
@@ -503,6 +519,7 @@ def save_page_content(slug):
 
 @app.delete("/<slug>/api/page-content")
 def reset_page_content(slug):
+    require_landing(slug)
     with get_db(slug) as conn:
         conn.execute("DELETE FROM page_content WHERE key = ?", ("editable_html",))
         conn.commit()
@@ -511,12 +528,14 @@ def reset_page_content(slug):
 
 @app.get("/<slug>/api/form-fields")
 def list_form_fields(slug):
+    require_landing(slug)
     with get_db(slug) as conn:
         return jsonify({"fields": get_form_fields(conn)})
 
 
 @app.put("/<slug>/api/form-fields")
 def replace_form_fields(slug):
+    require_landing(slug)
     data = request.get_json(silent=True) or {}
     incoming = data.get("fields")
     if not isinstance(incoming, list):
@@ -574,6 +593,7 @@ def replace_form_fields(slug):
 
 @app.post("/<slug>/api/form-fields")
 def add_form_field(slug):
+    require_landing(slug)
     data = request.get_json(silent=True) or {}
     label = clean(data.get("label"))
     if not label:
@@ -602,6 +622,7 @@ def add_form_field(slug):
 
 @app.patch("/<slug>/api/form-fields/<field_key>")
 def update_form_field(slug, field_key):
+    require_landing(slug)
     key = normalize_key(field_key)
     data = request.get_json(silent=True) or {}
     label = clean(data.get("label"))
@@ -631,6 +652,7 @@ def update_form_field(slug, field_key):
 
 @app.delete("/<slug>/api/form-fields/<field_key>")
 def delete_form_field(slug, field_key):
+    require_landing(slug)
     key = normalize_key(field_key)
     if key in RESERVED_COLUMNS:
         return jsonify({"error": "Không thể xoá cột hệ thống."}), 400
@@ -647,6 +669,7 @@ def delete_form_field(slug, field_key):
 
 @app.get("/<slug>/api/leads")
 def list_leads(slug):
+    require_landing(slug)
     with get_db(slug) as conn:
         fields = get_form_fields(conn)
         columns = ["id", "ts"] + [field["key"] for field in fields]
@@ -657,6 +680,7 @@ def list_leads(slug):
 
 @app.post("/<slug>/api/leads")
 def create_lead(slug):
+    require_landing(slug)
     data = request.get_json(silent=True) or {}
     with get_db(slug) as conn:
         fields = get_form_fields(conn)
@@ -675,6 +699,7 @@ def create_lead(slug):
 
 @app.delete("/<slug>/api/leads/<lead_id>")
 def delete_lead(slug, lead_id):
+    require_landing(slug)
     with get_db(slug) as conn:
         conn.execute("DELETE FROM leads WHERE id = ?", (lead_id,))
         conn.commit()
@@ -683,7 +708,7 @@ def delete_lead(slug, lead_id):
 
 @app.get("/<slug>/<path:path>")
 def slug_fallback(slug, path):
-    validate_slug(slug)
+    require_landing(slug)
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
     file_path = BASE_DIR / path
@@ -695,7 +720,7 @@ def slug_fallback(slug, path):
 @app.get("/<path:path>")
 def fallback(path):
     normalized = normalize_slug(path)
-    if normalized == path and is_valid_slug(path):
+    if normalized == path and landing_exists(path):
         return redirect(f"/{path}/", code=301)
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
