@@ -15,8 +15,8 @@
 
   <div id="edit-toolbar" class="edit-toolbar" aria-live="polite">
     <strong>Chế độ sửa UI</strong>
-    <button type="button" onclick="addEditableSection()">+ Section</button>
-    <button type="button" onclick="openHtmlPaste()">Dán HTML</button>
+    <button type="button" onclick="openHtmlPaste()">Thay HTML</button>
+    <button type="button" onclick="openFormFieldManager()">Quản lý form</button>
     <button type="button" onclick="saveEditableContent()">Lưu UI</button>
     <button type="button" onclick="resetEditableContent()">Reset mẫu</button>
     <button type="button" onclick="disableEditMode()">Tắt sửa</button>
@@ -24,13 +24,38 @@
   </div>
   <div id="html-paste-modal" class="html-paste-modal" style="display:none">
     <div class="html-paste-box">
-      <div class="html-paste-title">Dán HTML cho phần UI phía trên form</div>
+      <div class="html-paste-title">Thay toàn bộ HTML landing</div>
       <textarea id="paste-html-input" spellcheck="false" placeholder="Dán HTML ở đây..."></textarea>
       <div class="html-paste-actions">
-        <button type="button" onclick="applyPastedHtml('replace')">Thay toàn bộ UI</button>
-        <button type="button" onclick="applyPastedHtml('append')">Thêm vào cuối</button>
+        <button type="button" onclick="applyPastedHtml('replace')">Thay toàn bộ HTML</button>
         <button type="button" onclick="closeHtmlPaste()">Đóng</button>
       </div>
+    </div>
+  </div>
+  <div id="form-field-modal" class="html-paste-modal" style="display:none">
+    <div class="html-paste-box form-field-box">
+      <div class="html-paste-title">Quản lý trường form</div>
+      <div class="form-field-grid">
+        <label class="form-label">Tên trường</label>
+        <input class="form-input" id="new-field-label" type="text" placeholder="Ví dụ: Vốn đầu tư">
+        <label class="form-label">Kiểu nhập</label>
+        <select class="form-select" id="new-field-type">
+          <option value="text">Text</option>
+          <option value="tel">Số điện thoại</option>
+          <option value="email">Email</option>
+          <option value="number">Số</option>
+          <option value="date">Ngày</option>
+          <option value="textarea">Textarea</option>
+        </select>
+        <label class="form-label">Placeholder</label>
+        <input class="form-input" id="new-field-placeholder" type="text" placeholder="Ví dụ: 500 triệu">
+        <label class="form-field-check"><input id="new-field-required" type="checkbox"> Bắt buộc nhập</label>
+      </div>
+      <div class="html-paste-actions" style="justify-content:space-between">
+        <button type="button" onclick="addFormField()">Thêm trường</button>
+        <button type="button" onclick="closeFormFieldModal()">Đóng</button>
+      </div>
+      <div id="form-field-list" class="form-field-list"></div>
     </div>
   </div>
   <main id="editable-area"><!-- ══════════ NAV ══════════ -->
@@ -540,7 +565,8 @@
 <script>
   const ADMIN_PIN = "9983";
   let leadsCache = [];
-  let adminUnlocked = false;
+  let adminUnlocked = sessionStorage.getItem("stocktraders_admin_unlocked") === "1";
+  let formFields = [];
   function setEditStatus(message, isError = false) {
     const el = document.getElementById("edit-status");
     if (!el) return;
@@ -556,6 +582,7 @@
     root.querySelectorAll(".section-edit-actions").forEach((el) => el.remove());
     root.querySelectorAll("[data-edit-section]").forEach((el) => el.removeAttribute("data-edit-section"));
     root.querySelectorAll("[contenteditable]").forEach((el) => el.removeAttribute("contenteditable"));
+    root.querySelectorAll("[data-edit-clickable]").forEach((el) => el.removeAttribute("data-edit-clickable"));
   }
 
   function prepareEditableSections() {
@@ -593,6 +620,23 @@
     }
   }
 
+  function enableInteractiveTextEditing(area) {
+    area.querySelectorAll("button, a, [onclick]").forEach((el) => {
+      if (el.closest("#admin-panel") || el.closest("#edit-toolbar") || el.closest("#html-paste-modal") || el.closest("#form-field-modal")) return;
+      el.setAttribute("contenteditable", "true");
+      el.dataset.editClickable = "1";
+    });
+  }
+
+  function blockEditableClicks(event) {
+    const area = getEditableArea();
+    if (!area?.classList.contains("edit-mode")) return;
+    const interactive = event.target.closest("button, a, [onclick]");
+    if (!interactive || !area.contains(interactive)) return;
+    if (interactive.closest("#edit-toolbar") || interactive.closest("#html-paste-modal") || interactive.closest("#form-field-modal")) return;
+    event.preventDefault();
+    event.stopPropagation();
+  }
   function enableEditMode() {
     const area = getEditableArea();
     const toolbar = document.getElementById("edit-toolbar");
@@ -600,6 +644,7 @@
     toolbar.style.display = "flex";
     area.classList.add("edit-mode");
     area.setAttribute("contenteditable", "true");
+    enableInteractiveTextEditing(area);
     prepareEditableSections();
     setEditStatus("Đang sửa. Bấm trực tiếp vào chữ để đổi nội dung.");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -619,6 +664,7 @@
     const area = getEditableArea();
     const clone = area.cloneNode(true);
     removeEditControls(clone);
+    removePublicAdminPanels(clone);
     clone.classList.remove("edit-mode");
     clone.removeAttribute("id");
     return clone.innerHTML.trim();
@@ -649,21 +695,6 @@
       console.error("Không reset được UI:", err);
       setEditStatus("Không reset được UI.", true);
     }
-  }
-
-  function addEditableSection() {
-    const area = getEditableArea();
-    if (!area) return;
-    const section = document.createElement("section");
-    section.className = "reveal vis custom-edit-section";
-    section.innerHTML = `
-      <div class="section-eyebrow">Section mới</div>
-      <div class="section-title">Tiêu đề mới</div>
-      <p class="section-sub">Bấm trực tiếp vào chữ để chỉnh nội dung. Có thể dán HTML bằng nút trên thanh sửa.</p>
-    `;
-    area.appendChild(section);
-    prepareEditableSections();
-    section.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function removeEditableSection(button) {
@@ -783,6 +814,26 @@
     return output;
   }
 
+  function removePublicAdminPanels(root) {
+    if (!root?.querySelectorAll) return;
+    root.querySelectorAll([
+      "#admin-panel",
+      "#admin-login",
+      "#admin-dash",
+      "#admin-table",
+      "[id^='admin-']",
+      "[class*='admin' i]",
+      "[data-admin]"
+    ].join(",")).forEach((el) => el.remove());
+
+    root.querySelectorAll("section, div, table").forEach((el) => {
+      const text = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (/Danh sách (khách|đăng ký)|Xuất CSV|Mã PIN|PIN chỉ dùng|admin/i.test(text)) {
+        const hasLeadTable = /Thời gian.*Họ tên.*(SĐT|Số điện thoại)/i.test(text);
+        if (hasLeadTable || /Xuất CSV|Mã PIN|PIN chỉ dùng|admin/i.test(text)) el.remove();
+      }
+    });
+  }
   function extractHtmlForEditableArea(rawHtml, mode = "append") {
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHtml, "text/html");
@@ -803,6 +854,7 @@
     }
 
     container.querySelectorAll("script, meta, title, base").forEach((el) => el.remove());
+    removePublicAdminPanels(container);
     const bodyHtml = container.innerHTML.trim();
 
     if (mode === "replace") {
@@ -821,7 +873,7 @@
     return `<section class="custom-pasted-section ${scopeClass}">${scopedStyle}<div class="pasted-document">${bodyHtml}</div></section>`;
   }
 
-  function applyPastedHtml(mode) {
+  async function applyPastedHtml(mode) {
     const area = getEditableArea();
     const input = document.getElementById("paste-html-input");
     const html = input.value.trim();
@@ -831,6 +883,14 @@
     const filteredHtml = extractHtmlForEditableArea(html, mode);
     if (mode === "replace") area.innerHTML = filteredHtml;
     if (mode === "append") area.insertAdjacentHTML("beforeend", filteredHtml);
+
+    const detectedFields = detectFormFieldsFromRoot(area);
+    if (mode === "replace" && shouldOfferFieldSync(detectedFields)) {
+      const summary = detectedFields.map((field) => `${field.label}${field.required ? " *" : ""}`).join(", ");
+      if (confirm(`Form mới có các trường: ${summary}. Đồng bộ Quản lý form và DB theo form này?`)) {
+        await syncDetectedFormFields(detectedFields);
+      }
+    }
 
     input.value = "";
     closeHtmlPaste();
@@ -842,15 +902,232 @@
     );
   }
 
-  function findLeadElements(context = document) {
-    const root = context || document;
-    const inputs = Array.from(root.querySelectorAll("input, textarea, select"))
-      .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "radio"].includes((el.type || "").toLowerCase()));
-    const by = (selector) => root.querySelector(selector) || document.querySelector(selector);
-    const name = by("#lead-name, [name='name'], [name='fullname'], [name='full_name'], [name*='ten' i], [name*='name' i]") || inputs[0] || null;
-    const phone = by("#lead-phone, input[type='tel'], [name='phone'], [name*='phone' i], [name*='sdt' i], [name*='dien-thoai' i]") || inputs.find((el) => el !== name) || null;
-    const third = by("#lead-capital, #lead-email, [name='capital'], [name='email'], [name*='capital' i], [name*='email' i], [name*='von' i]") || inputs.find((el) => el !== name && el !== phone) || null;
-    return { name, phone, third };
+  function fieldInputId(key) {
+    return "lead-" + String(key || "").replace(/[^a-zA-Z0-9_-]/g, "-");
+  }
+
+  function cssEscape(value) {
+    return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  }
+
+  async function loadFormFields() {
+    try {
+      const data = await requestJson("", { apiBase: "api/form-fields" });
+      formFields = Array.isArray(data.fields) ? data.fields : [];
+      renderFormFieldManager();
+    } catch (err) {
+      console.error("Không tải được cấu hình form:", err);
+      if (!formFields.length) {
+        formFields = [
+          { key: "name", label: "Họ và tên", type: "text", placeholder: "Nguyễn Văn A", required: true, protected: false },
+          { key: "phone", label: "Số điện thoại", type: "tel", placeholder: "0901 234 567", required: true, protected: false },
+          { key: "email", label: "Email", type: "email", placeholder: "email@example.com", required: false, protected: false },
+        ];
+      }
+    }
+    return formFields;
+  }
+
+  function fieldSelector(field) {
+    const key = cssEscape(field.key);
+    return `[data-field-key="${key}"], #${fieldInputId(field.key)}, [name="${key}"]`;
+  }
+
+  function normalizeVietnameseKey(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 40) || "field";
+  }
+
+  function textForFieldGuess(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
+  }
+
+  function inferCanonicalKey(label, el) {
+    const haystack = textForFieldGuess([label, el?.name, el?.id, el?.placeholder, el?.type].join(" "));
+    if (/email|e_mail|mail/.test(haystack)) return "email";
+    if (/phone|tel|sdt|so_dien_thoai|dien thoai/.test(haystack)) return "phone";
+    if (/full.?name|name|ho va ten|ho ten|ten khach/.test(haystack)) return "name";
+    if (/capital|investment|amount|budget|von dau tu|so von|von/.test(haystack)) return "capital";
+    return normalizeVietnameseKey(label || el?.name || el?.id || el?.placeholder);
+  }
+
+  function cleanFieldLabel(value) {
+    return String(value || "")
+      .replace(/[*:：]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function labelForInput(el, root = document) {
+    if (!el) return "";
+    if (el.id) {
+      const direct = root.querySelector?.(`label[for="${cssEscape(el.id)}"]`);
+      if (direct?.textContent) return cleanFieldLabel(direct.textContent);
+    }
+    const wrapperLabel = el.closest("label");
+    if (wrapperLabel?.textContent) {
+      return cleanFieldLabel(wrapperLabel.textContent.replace(el.value || "", ""));
+    }
+    const row = el.closest(".form-row, [data-form-row], .field, .input-group, div, p");
+    const rowLabel = row?.querySelector?.("label, .form-label, .label, [class*='label' i]");
+    if (rowLabel?.textContent) return cleanFieldLabel(rowLabel.textContent);
+    let prev = el.previousElementSibling;
+    while (prev) {
+      if (/^(label|span|div|p)$/i.test(prev.tagName) && cleanFieldLabel(prev.textContent)) {
+        return cleanFieldLabel(prev.textContent);
+      }
+      prev = prev.previousElementSibling;
+    }
+    return cleanFieldLabel(el.getAttribute("aria-label") || el.placeholder || el.name || el.id);
+  }
+
+  function inferInputType(el) {
+    if (!el) return "text";
+    if (el.tagName?.toLowerCase() === "textarea") return "textarea";
+    const type = (el.type || "text").toLowerCase();
+    if (["tel", "email", "number", "date"].includes(type)) return type;
+    return "text";
+  }
+
+  function detectFormFieldsFromRoot(root = document) {
+    const container = getLeadFormContainer(root);
+    if (!container?.querySelectorAll) return [];
+    const controls = Array.from(container.querySelectorAll("input, textarea, select"))
+      .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((el.type || "").toLowerCase()));
+    const seen = new Set();
+    return controls.map((el, index) => {
+      const label = labelForInput(el, container);
+      const key = inferCanonicalKey(label, el);
+      const field = {
+        key,
+        label: label || `Trường ${index + 1}`,
+        type: inferInputType(el),
+        placeholder: el.placeholder || "",
+        required: !!el.required || /\*/.test(labelForInput(el, container)),
+        position: (index + 1) * 10,
+      };
+      return field;
+    }).filter((field) => {
+      if (!field.label || seen.has(field.key)) return false;
+      seen.add(field.key);
+      return true;
+    });
+  }
+
+  function shouldOfferFieldSync(detectedFields) {
+    if (!detectedFields.length) return false;
+    const current = formFields.map((field) => `${field.key}:${field.label}:${field.type}:${field.required}`).join("|");
+    const next = detectedFields.map((field) => `${field.key}:${field.label}:${field.type}:${field.required}`).join("|");
+    return current !== next;
+  }
+
+  async function syncDetectedFormFields(detectedFields) {
+    const data = await requestJson("", {
+      apiBase: "api/form-fields",
+      method: "PUT",
+      body: JSON.stringify({ fields: detectedFields }),
+    });
+    formFields = Array.isArray(data.fields) ? data.fields : detectedFields;
+    renderFormFieldManager();
+    setEditStatus("Đã đồng bộ field form và DB theo HTML mới.");
+  }
+
+  function getLeadFormContainer(root = document) {
+    const scope = root || document;
+    const submitSelector = "#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn";
+    const buttons = Array.from(scope.querySelectorAll?.(submitSelector) || []);
+    for (const button of buttons) {
+      const container = button.closest("form, .form-box, .signup-box, .form-section, section, div");
+      if (container?.querySelector?.("input:not([type='hidden']), textarea, select")) return container;
+    }
+    const form = scope.querySelector?.("form");
+    if (form) return form;
+    const firstInput = scope.querySelector?.("input:not([type='hidden']), textarea, select");
+    return firstInput?.closest("form, .form-box, .signup-box, .form-section, section, div") || scope;
+  }
+
+  function findExistingFieldElement(field, container, used = new Set()) {
+    let el = container.querySelector?.(fieldSelector(field));
+    if (el && !used.has(el)) return el;
+    if (field.key === "name") {
+      el = container.querySelector?.("#lead-name, [name='name'], [name='fullname'], [name='full_name'], [name*='ten' i], [name*='name' i]");
+    } else if (field.key === "phone") {
+      el = container.querySelector?.("#lead-phone, input[type='tel'], [name='phone'], [name*='phone' i], [name*='sdt' i], [name*='dien-thoai' i]");
+    } else if (field.key === "email") {
+      el = container.querySelector?.("#lead-email, [name='email'], [name*='email' i], [name*='mail' i]");
+    } else if (field.key === "capital") {
+      el = container.querySelector?.("#lead-capital, [name='capital'], [name*='capital' i], [name*='investment' i], [name*='von' i]");
+    }
+    if (el && !used.has(el)) return el;
+
+    const candidates = Array.from(container.querySelectorAll("input, textarea, select"))
+      .filter((input) => !used.has(input) && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((input.type || "").toLowerCase()));
+    el = candidates.find((input) => inferCanonicalKey(labelForInput(input, container), input) === field.key) || null;
+    if (el && !used.has(el)) return el;
+    return null;
+  }
+
+  function fieldRowHtml(field) {
+    const required = field.required ? " *" : "";
+    const key = escapeHtml(field.key);
+    const label = escapeHtml(field.label + required);
+    const placeholder = escapeHtml(field.placeholder || "");
+    const type = ["text", "tel", "email", "number", "date"].includes(field.type) ? field.type : "text";
+    if (field.type === "textarea") {
+      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><textarea class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" placeholder="${placeholder}" rows="3"></textarea></div>`;
+    }
+    return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><input class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" type="${type}" placeholder="${placeholder}"></div>`;
+  }
+
+  function ensureFormFields(root = document) {
+    if (!formFields.length) return;
+    const container = getLeadFormContainer(root);
+    if (!container) return;
+    const submit = container.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
+    const err = container.querySelector?.("#form-error, .form-error, [data-form-error]");
+    const insertBefore = err || submit;
+    const used = new Set();
+
+    formFields.forEach((field) => {
+      let el = findExistingFieldElement(field, container, used);
+      if (!el) {
+        if (insertBefore?.parentNode) {
+          insertBefore.insertAdjacentHTML("beforebegin", fieldRowHtml(field));
+        } else {
+          container.insertAdjacentHTML("beforeend", fieldRowHtml(field));
+        }
+        el = container.querySelector(fieldSelector(field));
+      }
+      if (!el) return;
+      used.add(el);
+      el.dataset.fieldKey = field.key;
+      el.name = field.key;
+      if (!el.id) el.id = fieldInputId(field.key);
+      if (!el.placeholder && field.placeholder) el.placeholder = field.placeholder;
+      const row = el.closest(".form-row, [data-form-row]");
+      if (row) row.dataset.formRow = field.key;
+    });
+
+    container.querySelectorAll("[data-field-key]").forEach((el) => {
+      const key = el.dataset.fieldKey;
+      if (!formFields.some((field) => field.key === key)) {
+        const row = el.closest(".form-row, [data-form-row]");
+        if (row) row.remove();
+        else el.remove();
+      }
+    });
   }
 
   function ensureFormErrorBox(context, beforeEl) {
@@ -867,16 +1144,13 @@
 
   function normalizeLeadForm(root = document) {
     const scope = root || document;
-    const { name, phone, third } = findLeadElements(scope);
-    if (name && !document.getElementById("lead-name")) name.id = "lead-name";
-    if (phone && !document.getElementById("lead-phone")) phone.id = "lead-phone";
-    if (third && !document.getElementById("lead-email") && !document.getElementById("lead-capital")) third.id = "lead-email";
-
-    const submit = scope.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn") || document.getElementById("form-submit-btn");
+    ensureFormFields(scope);
+    const container = getLeadFormContainer(scope);
+    const submit = container.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn") || document.getElementById("form-submit-btn");
     if (submit) {
       if (!submit.id) submit.id = "form-submit-btn";
       submit.onclick = handleSubmit;
-      ensureFormErrorBox(submit.closest("form, section, .form-section, .signup-box, .form-box, [data-lead-form]") || scope, submit);
+      ensureFormErrorBox(container, submit);
     }
   }
 
@@ -900,10 +1174,140 @@
   }
 
   function bindLandingRuntime(root = document) {
+    if (root === getEditableArea()) removePublicAdminPanels(root);
     normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
 
+  function openFormFieldModal() {
+    document.getElementById("form-field-modal").style.display = "grid";
+    renderFormFieldManager();
+    document.getElementById("new-field-label").focus();
+  }
+
+  function openFormFieldManager() {
+    openFormFieldModal();
+  }
+
+  function closeFormFieldModal() {
+    document.getElementById("form-field-modal").style.display = "none";
+  }
+
+  function renderFormFieldManager() {
+    const list = document.getElementById("form-field-list");
+    if (!list) return;
+    if (!formFields.length) {
+      list.innerHTML = '<div class="form-field-empty">Chưa có trường form nào. Thêm trường mới phía trên.</div>';
+      return;
+    }
+    const typeOptions = ["text", "tel", "email", "number", "date", "textarea"];
+    list.innerHTML = formFields.map((field) => `
+      <div class="form-field-item" data-manager-field="${escapeHtml(field.key)}">
+        <div class="form-field-edit-grid">
+          <div>
+            <label class="form-label">Tên trường</label>
+            <input class="form-input" data-edit-field="label" value="${escapeHtml(field.label)}">
+          </div>
+          <div>
+            <label class="form-label">Kiểu</label>
+            <select class="form-select" data-edit-field="type">
+              ${typeOptions.map((type) => `<option value="${type}" ${field.type === type ? "selected" : ""}>${type}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Placeholder</label>
+            <input class="form-input" data-edit-field="placeholder" value="${escapeHtml(field.placeholder || "")}">
+          </div>
+          <label class="form-field-check"><input type="checkbox" data-edit-field="required" ${field.required ? "checked" : ""}> Bắt buộc</label>
+        </div>
+        <div class="form-field-actions">
+          <button type="button" class="save-field" onclick="updateFormField('${escapeHtml(field.key)}')">Lưu</button>
+          <button type="button" onclick="deleteFormField('${escapeHtml(field.key)}')">Xoá</button>
+        </div>
+      </div>
+    `).join("");
+  }
+  async function addFormField() {
+    const labelEl = document.getElementById("new-field-label");
+    const typeEl = document.getElementById("new-field-type");
+    const placeholderEl = document.getElementById("new-field-placeholder");
+    const requiredEl = document.getElementById("new-field-required");
+    const label = labelEl.value.trim();
+    if (!label) {
+      alert("Nhập tên trường trước.");
+      return;
+    }
+    try {
+      const data = await requestJson("", {
+        apiBase: "api/form-fields",
+        method: "POST",
+        body: JSON.stringify({
+          label,
+          type: typeEl.value,
+          placeholder: placeholderEl.value.trim(),
+          required: requiredEl.checked,
+        }),
+      });
+      formFields = Array.isArray(data.fields) ? data.fields : formFields;
+      labelEl.value = "";
+      placeholderEl.value = "";
+      requiredEl.checked = false;
+      renderFormFieldManager();
+      bindLandingRuntime(getEditableArea());
+      setEditStatus("Đã thêm trường form và cột DB tương ứng.");
+    } catch (err) {
+      console.error("Không thêm được trường form:", err);
+      alert(err.message || "Không thêm được trường form.");
+    }
+  }
+
+  async function updateFormField(key) {
+    const row = document.querySelector(`[data-manager-field="${cssEscape(key)}"]`);
+    if (!row) return;
+    const label = row.querySelector('[data-edit-field="label"]')?.value.trim() || "";
+    const type = row.querySelector('[data-edit-field="type"]')?.value || "text";
+    const placeholder = row.querySelector('[data-edit-field="placeholder"]')?.value.trim() || "";
+    const required = !!row.querySelector('[data-edit-field="required"]')?.checked;
+    if (!label) {
+      alert("Tên trường không được trống.");
+      return;
+    }
+    try {
+      const data = await requestJson("/" + encodeURIComponent(key), {
+        apiBase: "api/form-fields",
+        method: "PATCH",
+        body: JSON.stringify({ label, type, placeholder, required }),
+      });
+      formFields = Array.isArray(data.fields) ? data.fields : formFields;
+      renderFormFieldManager();
+      bindLandingRuntime(getEditableArea());
+      setEditStatus("Đã lưu thay đổi trường form.");
+    } catch (err) {
+      console.error("Không sửa được trường form:", err);
+      alert(err.message || "Không sửa được trường form.");
+    }
+  }
+  async function deleteFormField(key) {
+    if (!confirm("Xoá trường này khỏi form và xoá cột tương ứng trong DB?")) return;
+    try {
+      const data = await requestJson("/" + encodeURIComponent(key), {
+        apiBase: "api/form-fields",
+        method: "DELETE",
+      });
+      formFields = Array.isArray(data.fields) ? data.fields : formFields.filter((field) => field.key !== key);
+      document.querySelectorAll(`[data-field-key="${cssEscape(key)}"]`).forEach((el) => {
+        const row = el.closest(".form-row, [data-form-row]");
+        if (row) row.remove();
+        else el.remove();
+      });
+      renderFormFieldManager();
+      bindLandingRuntime(getEditableArea());
+      setEditStatus("Đã xoá trường form và cột DB tương ứng.");
+    } catch (err) {
+      console.error("Không xoá được trường form:", err);
+      alert(err.message || "Không xoá được trường form.");
+    }
+  }
   const escapeHtml = (s) =>
     String(s || "").replace(/[&<>"']/g, (c) => ({
       "&": "&amp;",
@@ -926,37 +1330,47 @@
     return data;
   };
 
-  const renderLeads = (leads) => {
+  const renderLeads = (leads, fields = formFields) => {
+    const table = document.getElementById("admin-table");
     const tbody = document.getElementById("admin-tbody");
     const countEl = document.getElementById("admin-count");
-    if (!tbody || !countEl) return;
+    if (!table || !tbody || !countEl) return;
 
+    const activeFields = fields.length ? fields : formFields;
+    const colCount = activeFields.length + 2;
     countEl.textContent = "(" + leads.length + ")";
+    const thead = table.querySelector("thead");
+    if (thead) {
+      thead.innerHTML = `<tr style="text-align:left;color:var(--t3);border-bottom:.5px solid var(--bdr)">
+        <th style="padding:8px 10px">Thời gian</th>
+        ${activeFields.map((field) => `<th style="padding:8px 10px">${escapeHtml(field.label)}</th>`).join("")}
+        <th style="padding:8px 10px"></th>
+      </tr>`;
+    }
+
     if (leads.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Chưa có khách đăng ký nào.</td></tr>';
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="padding:20px 10px;color:var(--t4);text-align:center">Chưa có khách đăng ký nào.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = leads.map((l) => {
-      const d = new Date(l.ts);
+    tbody.innerHTML = leads.map((lead) => {
+      const d = new Date(lead.ts);
       const dateStr = isNaN(d) ? "" : d.toLocaleString("vi-VN");
       return `<tr style="border-bottom:.5px solid var(--bdr)">
         <td style="padding:9px 10px;color:var(--t3);white-space:nowrap">${dateStr}</td>
-        <td style="padding:9px 10px;color:var(--t1);font-weight:600">${escapeHtml(l.name)}</td>
-        <td style="padding:9px 10px">${escapeHtml(l.phone)}</td>
-        <td style="padding:9px 10px;color:var(--t2)">${escapeHtml(l.email || "-")}</td>
-        <td style="padding:9px 10px;text-align:right"><button onclick="deleteLead('${l.id}')" style="background:none;border:none;color:var(--R);cursor:pointer;font-size:12px"><i class="ti ti-trash"></i></button></td>
+        ${activeFields.map((field) => `<td style="padding:9px 10px;color:var(--t2)">${escapeHtml(lead[field.key] || "")}</td>`).join("")}
+        <td style="padding:9px 10px;text-align:right"><button onclick="deleteLead('${lead.id}')" style="background:none;border:none;color:var(--R);cursor:pointer;font-size:12px"><i class="ti ti-trash"></i></button></td>
       </tr>`;
     }).join("");
   };
-
   async function loadLeads() {
     const tbody = document.getElementById("admin-tbody");
     if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--t4);text-align:center">Đang tải...</td></tr>';
     try {
       const data = await requestJson();
+      if (Array.isArray(data.fields)) formFields = data.fields;
       leadsCache = Array.isArray(data.leads) ? data.leads : [];
-      renderLeads(leadsCache);
+      renderLeads(leadsCache, formFields);
     } catch (err) {
       console.error("Không tải được leads từ API:", err);
       if (tbody) tbody.innerHTML = '<tr><td colspan="5" style="padding:20px 10px;color:var(--R);text-align:center">Không kết nối được API lưu đăng ký.</td></tr>';
@@ -966,18 +1380,21 @@
   async function handleSubmit(e) {
     e.preventDefault();
     const trigger = e.currentTarget || e.submitter || e.target;
-    const context = trigger?.closest?.("form, section, .form-section, .signup-box, .form-box, [data-lead-form]") || document;
+    const context = getLeadFormContainer(trigger?.closest?.("form, section, .form-section, .signup-box, .form-box, [data-lead-form]") || document);
     const btn = trigger?.matches?.("button, input[type='submit']") ? trigger : (context.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn") || document.getElementById("form-submit-btn"));
     const errBox = ensureFormErrorBox(context, btn);
-    const { name: nameEl, phone: phoneEl, third: thirdEl } = findLeadElements(context);
-    const name = (nameEl?.value || "").trim();
-    const phone = (phoneEl?.value || "").trim();
-    const third = (thirdEl?.value || "").trim();
+    const payload = {};
+
+    formFields.forEach((field) => {
+      const el = context.querySelector(fieldSelector(field)) || document.querySelector(fieldSelector(field));
+      payload[field.key] = (el?.value || "").trim();
+    });
 
     if (errBox) errBox.style.display = "none";
-    if (!name || !phone) {
+    const missing = formFields.filter((field) => field.required && !payload[field.key]).map((field) => field.label);
+    if (missing.length) {
       if (errBox) {
-        errBox.textContent = "Vui lòng nhập đầy đủ Họ tên và Số điện thoại.";
+        errBox.textContent = "Vui lòng nhập: " + missing.join(", ");
         errBox.style.display = "block";
       }
       return;
@@ -990,13 +1407,14 @@
     try {
       const data = await requestJson("", {
         method: "POST",
-        body: JSON.stringify({ name, phone, email: third, capital: third }),
+        body: JSON.stringify(payload),
       });
+      if (Array.isArray(data.fields)) formFields = data.fields;
       if (data?.lead) leadsCache = [data.lead, ...leadsCache];
     } catch (err) {
       console.error("Lưu đăng ký vào API thất bại:", err);
       if (errBox) {
-        errBox.textContent = "Không thể lưu đăng ký. Vui lòng kiểm tra server đang chạy.";
+        errBox.textContent = err.message || "Không thể lưu đăng ký. Vui lòng kiểm tra server đang chạy.";
         errBox.style.display = "block";
       }
       if (btn) {
@@ -1013,7 +1431,6 @@
       btn.style.cursor = "default";
     }
   }
-
   function closeAdmin() {
     document.getElementById("admin-panel").style.display = "none";
     document.getElementById("admin-login").style.display = "none";
@@ -1029,6 +1446,7 @@
     if (isHidden) {
       panel.style.display = "block";
       if (adminUnlocked) {
+        login.style.display = "none";
         dash.style.display = "block";
         loadLeads();
       enableEditMode();
@@ -1046,6 +1464,7 @@
     const err = document.getElementById("admin-login-err");
     if (pin === ADMIN_PIN) {
       adminUnlocked = true;
+      sessionStorage.setItem("stocktraders_admin_unlocked", "1");
       document.getElementById("admin-login").style.display = "none";
       document.getElementById("admin-dash").style.display = "block";
       err.style.display = "none";
@@ -1061,7 +1480,7 @@
     try {
       await requestJson("/" + encodeURIComponent(id), { method: "DELETE" });
       leadsCache = leadsCache.filter((l) => l.id !== id);
-      renderLeads(leadsCache);
+      renderLeads(leadsCache, formFields);
     } catch (err) {
       console.error("Không xoá được lead từ API:", err);
       alert("Không xoá được, vui lòng kiểm tra server rồi thử lại.");
@@ -1073,12 +1492,11 @@
       alert("Chưa có dữ liệu để xuất.");
       return;
     }
-    const header = ["Thời gian", "Họ tên", "Số điện thoại", "Email"];
-    const rows = leadsCache.map((l) => [
-      new Date(l.ts).toLocaleString("vi-VN"),
-      l.name || "",
-      l.phone || "",
-      l.email || "",
+    const activeFields = formFields.length ? formFields : [];
+    const header = ["Thời gian", ...activeFields.map((field) => field.label)];
+    const rows = leadsCache.map((lead) => [
+      new Date(lead.ts).toLocaleString("vi-VN"),
+      ...activeFields.map((field) => lead[field.key] || ""),
     ]);
     const csv = [header, ...rows]
       .map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))
@@ -1091,7 +1509,6 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-
   function updateCountdown() {
     const launch = new Date("2026-08-02T00:00:00+07:00");
     const now = new Date();
@@ -1116,7 +1533,14 @@
   }
 
   document.addEventListener("DOMContentLoaded", async () => {
+    await loadFormFields();
     await loadEditableContent();
+    bindLandingRuntime(getEditableArea());
+    document.addEventListener("click", blockEditableClicks, true);
+    document.addEventListener("submit", (e) => {
+      const fields = formFields.length ? formFields : [];
+      if (fields.length && e.target?.querySelector?.("input, textarea, select")) handleSubmit(e);
+    });
     updateCountdown();
     setInterval(updateCountdown, 1000);
 
