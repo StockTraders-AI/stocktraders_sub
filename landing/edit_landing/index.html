@@ -860,7 +860,7 @@
     if (mode === "replace") {
       const scopeSelector = "#editable-area";
       const scopedCss = styles.length ? scopeCss(styles.join("\n"), scopeSelector) : "";
-      const layoutGuard = `${scopeSelector}{width:100%!important;max-width:none!important;margin:0!important;} ${scopeSelector} > nav{max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
+      const layoutGuard = `${scopeSelector}{width:100%!important;max-width:none!important;margin:0!important;} ${scopeSelector} .reveal{opacity:1!important;transform:none!important;} ${scopeSelector} > nav{max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
       const scopedStyle = scopedCss ? `<style>${scopedCss}${layoutGuard}</style>` : `<style>${layoutGuard}</style>`;
       return `${scopedStyle}${bodyHtml}`;
     }
@@ -868,7 +868,7 @@
     const scopeClass = "pasted-ui-" + Date.now().toString(36);
     const scopeSelector = "." + scopeClass + " .pasted-document";
     const scopedCss = styles.length ? scopeCss(styles.join("\n"), scopeSelector) : "";
-    const layoutGuard = `${scopeSelector}{min-height:auto!important;width:100%!important;max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
+    const layoutGuard = `${scopeSelector}{min-height:auto!important;width:100%!important;max-width:none!important;} ${scopeSelector} .reveal{opacity:1!important;transform:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
     const scopedStyle = `<style>${scopedCss}${layoutGuard}</style>`;
     return `<section class="custom-pasted-section ${scopeClass}">${scopedStyle}<div class="pasted-document">${bodyHtml}</div></section>`;
   }
@@ -1173,8 +1173,14 @@
     });
   }
 
+  function activateRevealBlocks(root = document) {
+    const scope = root || document;
+    scope.querySelectorAll?.(".reveal").forEach((el) => el.classList.add("vis"));
+  }
+
   function bindLandingRuntime(root = document) {
     if (root === getEditableArea()) removePublicAdminPanels(root);
+    activateRevealBlocks(root);
     normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
