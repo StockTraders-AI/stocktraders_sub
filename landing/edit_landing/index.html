@@ -563,6 +563,7 @@
 
 
 <script>
+  window.__EDIT_LANDING_PRELOADED__ = false;
   const ADMIN_PIN = "9983";
   let leadsCache = [];
   let adminUnlocked = false;
@@ -665,6 +666,7 @@
     const clone = area.cloneNode(true);
     removeEditControls(clone);
     removePublicAdminPanels(clone);
+    removeInlineHandlers(clone);
     clone.classList.remove("edit-mode");
     clone.removeAttribute("id");
     return clone.innerHTML.trim();
@@ -834,6 +836,20 @@
       }
     });
   }
+
+  function removeInlineHandlers(root) {
+    if (!root?.querySelectorAll) return;
+    root.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes || []).forEach((attr) => {
+        const name = attr.name.toLowerCase();
+        const value = String(attr.value || "").trim().toLowerCase();
+        if (name.startsWith("on")) el.removeAttribute(attr.name);
+        if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+          el.setAttribute(attr.name, "#");
+        }
+      });
+    });
+  }
   function extractHtmlForEditableArea(rawHtml, mode = "append") {
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHtml, "text/html");
@@ -855,6 +871,7 @@
 
     container.querySelectorAll("script, meta, title, base").forEach((el) => el.remove());
     removePublicAdminPanels(container);
+    removeInlineHandlers(container);
     const bodyHtml = container.innerHTML.trim();
 
     if (mode === "replace") {
@@ -1149,7 +1166,9 @@
     const submit = container.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn") || document.getElementById("form-submit-btn");
     if (submit) {
       if (!submit.id) submit.id = "form-submit-btn";
+      submit.removeAttribute("onclick");
       submit.onclick = handleSubmit;
+      container.querySelector?.("form")?.removeAttribute("onsubmit");
       ensureFormErrorBox(container, submit);
     }
   }
@@ -1383,6 +1402,19 @@
     }
   }
 
+  function interceptLeadSubmit(event) {
+    if (getEditableArea()?.classList.contains("edit-mode")) return;
+    const submit = event.target?.closest?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
+    if (!submit) return;
+    const area = getEditableArea();
+    if (area && !area.contains(submit)) return;
+    const container = getLeadFormContainer(submit.closest("form, section, .form-section, .signup-box, .form-box, [data-lead-form]") || document);
+    if (!container?.querySelector?.("input:not([type='hidden']), textarea, select")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    handleSubmit({ preventDefault() {}, currentTarget: submit, submitter: submit, target: submit });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     const trigger = e.currentTarget || e.submitter || e.target;
@@ -1536,13 +1568,18 @@
 
   document.addEventListener("DOMContentLoaded", async () => {
     await loadFormFields();
-    await loadEditableContent();
+    if (!window.__EDIT_LANDING_PRELOADED__) await loadEditableContent();
     bindLandingRuntime(getEditableArea());
     document.addEventListener("click", blockEditableClicks, true);
+    document.addEventListener("click", interceptLeadSubmit, true);
     document.addEventListener("submit", (e) => {
       const fields = formFields.length ? formFields : [];
-      if (fields.length && e.target?.querySelector?.("input, textarea, select")) handleSubmit(e);
-    });
+      if (fields.length && e.target?.querySelector?.("input, textarea, select")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        handleSubmit(e);
+      }
+    }, true);
     updateCountdown();
     setInterval(updateCountdown, 1000);
 

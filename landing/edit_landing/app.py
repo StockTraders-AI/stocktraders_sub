@@ -1,11 +1,14 @@
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
+import gc
 import re
 import sqlite3
+import time
 import unicodedata
 import uuid
 
-from flask import Flask, abort, jsonify, redirect, request, send_from_directory
+from flask import Flask, abort, jsonify, redirect, request, Response, send_from_directory
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -60,6 +63,33 @@ def require_landing(slug):
     if not landing_exists(slug):
         abort(404)
     return slug
+
+
+def saved_page_html(slug):
+    with get_db(slug) as conn:
+        row = conn.execute(
+            "SELECT html FROM page_content WHERE key = ?",
+            ("editable_html",),
+        ).fetchone()
+    return sanitize_landing_html(row["html"]) if row and clean(row["html"]) else ""
+
+
+def render_landing_index(slug):
+    template = (BASE_DIR / "index.html").read_text(encoding="utf-8")
+    html = saved_page_html(slug)
+    if not html:
+        return Response(template, mimetype="text/html")
+
+    start_marker = '<main id="editable-area">'
+    start = template.find(start_marker)
+    end = template.find("</main>", start)
+    if start == -1 or end == -1:
+        return Response(template, mimetype="text/html")
+
+    body_start = start + len(start_marker)
+    rendered = template[:body_start] + html + template[end:]
+    rendered = rendered.replace("window.__EDIT_LANDING_PRELOADED__ = false;", "window.__EDIT_LANDING_PRELOADED__ = true;")
+    return Response(rendered, mimetype="text/html")
 
 
 def clean(value):
@@ -176,12 +206,19 @@ def ensure_schema(conn):
         ensure_lead_column(conn, key)
 
 
+@contextmanager
 def get_db(slug):
     conn = sqlite3.connect(db_file_for(slug))
     conn.row_factory = sqlite3.Row
-    ensure_schema(conn)
-    conn.commit()
-    return conn
+    try:
+        ensure_schema(conn)
+        conn.commit()
+        yield conn
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def landing_slugs():
@@ -212,6 +249,21 @@ def set_setting(conn, key, value):
     )
 
 
+def sanitize_landing_html(html):
+    source = str(html or "")
+    source = re.sub(r"(?is)<!doctype[^>]*>", "", source)
+    source = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "", source)
+    source = re.sub(r"(?is)<meta\b[^>]*>", "", source)
+    source = re.sub(r"(?is)<base\b[^>]*>", "", source)
+    source = re.sub(r"(?is)<title\b[^>]*>.*?</title>", "", source)
+    source = re.sub(r"(?is)</?(?:html|head|body)\b[^>]*>", "", source)
+    source = re.sub(r"(?is)\s+on[a-z]+\s*=\s*(['\"]).*?\1", "", source)
+    source = re.sub(r"(?is)\s+on[a-z]+\s*=\s*[^\s>]+", "", source)
+    source = re.sub(r"(?is)\s+href\s*=\s*(['\"])\s*javascript:.*?\1", ' href="#"', source)
+    source = re.sub(r"(?is)\s+href\s*=\s*javascript:[^\s>]+", ' href="#"', source)
+    return source.strip()
+
+
 def copy_public_template(src_slug, dst_slug):
     with get_db(src_slug) as src, get_db(dst_slug) as dst:
         page = src.execute(
@@ -225,7 +277,7 @@ def copy_public_template(src_slug, dst_slug):
                 INSERT INTO page_content (key, html, updated_at)
                 VALUES (?, ?, ?)
                 """,
-                ("editable_html", page["html"], datetime.now(timezone.utc).isoformat()),
+                ("editable_html", sanitize_landing_html(page["html"]), datetime.now(timezone.utc).isoformat()),
             )
 
         fields = get_form_fields(src)
@@ -252,10 +304,19 @@ def copy_public_template(src_slug, dst_slug):
 
 def delete_landing_files(slug):
     base = db_file_for(slug)
-    for suffix in ("", "-wal", "-shm", "-journal"):
-        path = base.with_name(base.name + suffix)
-        if path.exists():
-            path.unlink()
+    paths = [base.with_name(base.name + suffix) for suffix in ("", "-wal", "-shm", "-journal")]
+    last_error = None
+    for _ in range(6):
+        gc.collect()
+        try:
+            for path in paths:
+                if path.exists():
+                    path.unlink()
+            return True, ""
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.15)
+    return False, str(last_error or "Không xoá được DB.")
 
 
 def field_dict(row):
@@ -395,7 +456,9 @@ def delete_landing(slug):
     db_path = db_file_for(slug)
     if not db_path.exists():
         return jsonify({"error": "Landing không tồn tại."}), 404
-    delete_landing_files(slug)
+    deleted, error = delete_landing_files(slug)
+    if not deleted:
+        return jsonify({"error": "DB đang được process khác giữ. Restart app rồi xoá lại.", "detail": error}), 423
     return jsonify({"ok": True, "slug": slug})
 
 
@@ -437,7 +500,7 @@ def create_landing():
                     VALUES (?, ?, ?)
                     ON CONFLICT(key) DO UPDATE SET html = excluded.html, updated_at = excluded.updated_at
                     """,
-                    ("editable_html", html.strip(), datetime.now(timezone.utc).isoformat()),
+                    ("editable_html", sanitize_landing_html(html), datetime.now(timezone.utc).isoformat()),
                 )
                 conn.commit()
 
@@ -458,8 +521,8 @@ def root():
 
 @app.get("/<slug>/")
 def index(slug):
-    require_landing(slug)
-    return send_from_directory(BASE_DIR, "index.html")
+    slug = require_landing(slug)
+    return render_landing_index(slug)
 
 
 @app.get("/style.css")
@@ -491,7 +554,7 @@ def get_page_content(slug):
         row = conn.execute("SELECT html, updated_at FROM page_content WHERE key = ?", ("editable_html",)).fetchone()
     if not row:
         return jsonify({"html": "", "updated_at": ""})
-    return jsonify({"html": row["html"], "updated_at": row["updated_at"]})
+    return jsonify({"html": sanitize_landing_html(row["html"]), "updated_at": row["updated_at"]})
 
 
 @app.post("/<slug>/api/page-content")
@@ -503,7 +566,7 @@ def save_page_content(slug):
         return jsonify({"error": "Nội dung HTML không hợp lệ."}), 400
     if len(html) > 1_000_000:
         return jsonify({"error": "Nội dung HTML quá lớn."}), 400
-    saved = {"key": "editable_html", "html": html, "updated_at": datetime.now(timezone.utc).isoformat()}
+    saved = {"key": "editable_html", "html": sanitize_landing_html(html), "updated_at": datetime.now(timezone.utc).isoformat()}
     with get_db(slug) as conn:
         conn.execute(
             """
@@ -708,13 +771,13 @@ def delete_lead(slug, lead_id):
 
 @app.get("/<slug>/<path:path>")
 def slug_fallback(slug, path):
-    require_landing(slug)
+    slug = require_landing(slug)
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
     file_path = BASE_DIR / path
     if file_path.exists() and file_path.is_file():
         return send_from_directory(BASE_DIR, path)
-    return send_from_directory(BASE_DIR, "index.html")
+    return render_landing_index(slug)
 
 
 @app.get("/<path:path>")
