@@ -565,7 +565,7 @@
 <script>
   const ADMIN_PIN = "9983";
   let leadsCache = [];
-  let adminUnlocked = sessionStorage.getItem("stocktraders_admin_unlocked") === "1";
+  let adminUnlocked = false;
   let formFields = [];
   function setEditStatus(message, isError = false) {
     const el = document.getElementById("edit-status");
@@ -1432,6 +1432,7 @@
     }
   }
   function closeAdmin() {
+    adminUnlocked = false;
     document.getElementById("admin-panel").style.display = "none";
     document.getElementById("admin-login").style.display = "none";
     document.getElementById("admin-dash").style.display = "none";
@@ -1444,15 +1445,11 @@
     const dash = document.getElementById("admin-dash");
     const isHidden = panel.style.display === "none";
     if (isHidden) {
+      adminUnlocked = false;
       panel.style.display = "block";
-      if (adminUnlocked) {
-        login.style.display = "none";
-        dash.style.display = "block";
-        loadLeads();
-      enableEditMode();
-      } else {
-        login.style.display = "block";
-      }
+      login.style.display = "block";
+      dash.style.display = "none";
+      document.getElementById("admin-pin").value = "";
       setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
     } else {
       closeAdmin();
@@ -1464,7 +1461,6 @@
     const err = document.getElementById("admin-login-err");
     if (pin === ADMIN_PIN) {
       adminUnlocked = true;
-      sessionStorage.setItem("stocktraders_admin_unlocked", "1");
       document.getElementById("admin-login").style.display = "none";
       document.getElementById("admin-dash").style.display = "block";
       err.style.display = "none";
