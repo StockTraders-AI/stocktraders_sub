@@ -559,6 +559,17 @@ footer{
   isolation: isolate;
   overflow: hidden;
 }
+#editable-area > .custom-pasted-section:only-child {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+#editable-area > .custom-pasted-section:only-child > .pasted-document {
+  width: 100% !important;
+  max-width: none !important;
+}
 .custom-pasted-section > .pasted-document {
   width: 100%;
   min-height: auto !important;
