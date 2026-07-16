@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Landing Manager - StockTraders AI</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090d15; --panel:#111827; --line:#273247; --text:#eef2ff; --muted:#8190ad; --green:#38d68c; --purple:#8b5cf6; --red:#ff4778; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; background: radial-gradient(circle at top left, rgba(139,92,246,.16), transparent 34%), var(--bg); color:var(--text); }
+    main { width:min(1080px, calc(100vw - 32px)); margin:0 auto; padding:40px 0 56px; }
+    header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 0 28px; border-bottom:1px solid var(--line); }
+    h1 { margin:0; font-size:28px; line-height:1.1; }
+    .sub { margin-top:8px; color:var(--muted); font-size:14px; }
+    .grid { display:grid; grid-template-columns: 380px 1fr; gap:18px; margin-top:22px; align-items:start; }
+    .box { background:rgba(17,24,39,.9); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 24px 80px rgba(0,0,0,.25); }
+    label { display:block; margin:12px 0 6px; color:#8ea2c8; font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+    input, select, textarea { width:100%; border:1px solid var(--line); border-radius:10px; background:#172033; color:var(--text); padding:12px 13px; font:inherit; outline:none; }
+    textarea { min-height:160px; resize:vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size:12px; line-height:1.45; }
+    input:focus, select:focus, textarea:focus { border-color:var(--purple); box-shadow:0 0 0 3px rgba(139,92,246,.18); }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .actions { display:flex; gap:10px; align-items:center; margin-top:16px; flex-wrap:wrap; }
+    button, .btn { border:1px solid rgba(56,214,140,.5); background:var(--green); color:#04120b; border-radius:10px; padding:11px 14px; font-weight:800; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; min-height:40px; }
+    button.secondary, .btn.secondary { background:#172033; color:var(--text); border-color:var(--line); }
+    button.danger { color:var(--red); border-color:rgba(255,71,120,.45); }
+    .msg { min-height:20px; margin-top:12px; color:var(--muted); font-size:13px; }
+    .msg.err { color:var(--red); }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { padding:12px 10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:middle; }
+    th { color:#8ea2c8; font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    td code { color:var(--green); background:rgba(56,214,140,.08); padding:4px 7px; border-radius:7px; }
+    .empty { padding:30px; color:var(--muted); text-align:center; border:1px dashed var(--line); border-radius:12px; }
+    .hidden { display:none; }
+    @media (max-width: 860px) { .grid { grid-template-columns:1fr; } header { align-items:flex-start; flex-direction:column; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Quản lý landing</h1>
+        <div class="sub">Tạo URL mới như <strong>/tri-an/</strong>, <strong>/khach-hang/</strong>. Mỗi landing có DB, form và HTML riêng.</div>
+      </div>
+      <a class="btn secondary" href="/1/">Mở /1/</a>
+    </header>
+
+    <div class="grid">
+      <section class="box">
+        <h2 style="margin:0 0 4px;font-size:18px">Tạo landing mới</h2>
+        <div class="sub">Không có chức năng đặt mặc định cho /.</div>
+
+        <label for="pin">PIN admin</label>
+        <input id="pin" type="password" placeholder="Nhập PIN">
+
+        <label for="title">Tên landing</label>
+        <input id="title" type="text" placeholder="Ví dụ: Tri ân khách hàng">
+
+        <label for="slug">Slug URL</label>
+        <input id="slug" type="text" placeholder="tri-an">
+
+        <label for="source">Mẫu khởi tạo</label>
+        <select id="source">
+          <option value="default">Mẫu mặc định</option>
+          <option value="copy">Copy từ landing có sẵn</option>
+          <option value="html">Dán HTML mới</option>
+        </select>
+
+        <div id="copy-wrap" class="hidden">
+          <label for="copy-from">Copy từ</label>
+          <select id="copy-from"></select>
+        </div>
+
+        <div id="html-wrap" class="hidden">
+          <label for="html">HTML ban đầu</label>
+          <textarea id="html" spellcheck="false" placeholder="Dán HTML public landing ở đây..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="create-btn">Tạo landing</button>
+          <button type="button" class="secondary" id="reload-btn">Làm mới</button>
+        </div>
+        <div id="msg" class="msg"></div>
+      </section>
+
+      <section class="box">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px">
+          <h2 style="margin:0;font-size:18px">Danh sách landing</h2>
+          <span id="count" class="sub"></span>
+        </div>
+        <div id="list"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const slugInput = $("slug");
+    const titleInput = $("title");
+    const sourceInput = $("source");
+    const msg = $("msg");
+    let landings = [];
+
+    function slugify(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-+/g, "-")
+        .slice(0, 64);
+    }
+
+    titleInput.addEventListener("input", () => {
+      if (!slugInput.dataset.touched) slugInput.value = slugify(titleInput.value);
+    });
+    slugInput.addEventListener("input", () => {
+      slugInput.dataset.touched = "1";
+      slugInput.value = slugify(slugInput.value);
+    });
+    sourceInput.addEventListener("change", syncSourceControls);
+    $("reload-btn").addEventListener("click", loadLandings);
+    $("create-btn").addEventListener("click", createLanding);
+
+    function syncSourceControls() {
+      $("copy-wrap").classList.toggle("hidden", sourceInput.value !== "copy");
+      $("html-wrap").classList.toggle("hidden", sourceInput.value !== "html");
+    }
+
+    function setMessage(text, isError = false) {
+      msg.textContent = text || "";
+      msg.className = isError ? "msg err" : "msg";
+    }
+
+    async function requestJson(url, options = {}) {
+      const res = await fetch(url, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Request failed");
+      return data;
+    }
+
+    function renderLandings() {
+      $("count").textContent = landings.length + " landing";
+      const copy = $("copy-from");
+      copy.innerHTML = landings.map((item) => `<option value="${item.slug}">/${item.slug}/</option>`).join("");
+      if (!landings.length) {
+        $("list").innerHTML = '<div class="empty">Chưa có landing nào.</div>';
+        return;
+      }
+      $("list").innerHTML = `
+        <table>
+          <thead><tr><th>URL</th><th>Tên</th><th>Leads</th><th></th></tr></thead>
+          <tbody>
+            ${landings.map((item) => `
+              <tr>
+                <td><code>/${item.slug}/</code></td>
+                <td>${escapeHtml(item.title || item.slug)}</td>
+                <td>${item.leads || 0}</td>
+                <td style="text-align:right">
+                  <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+                    <a class="btn secondary" href="/${item.slug}/">Mở</a>
+                    ${item.protected ? "" : `<button type="button" class="secondary danger" onclick="deleteLanding('${item.slug}')">Xóa</button>`}
+                  </div>
+                </td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+
+    async function loadLandings() {
+      try {
+        const data = await requestJson("/api/landings");
+        landings = Array.isArray(data.landings) ? data.landings : [];
+        renderLandings();
+        setMessage("");
+      } catch (err) {
+        setMessage(err.message || "Không tải được danh sách landing.", true);
+      }
+    }
+
+    async function deleteLanding(slug) {
+      const pin = $("pin").value.trim();
+      if (!pin) {
+        setMessage("Nhập PIN trước khi xóa.", true);
+        return;
+      }
+      if (!confirm(`Xóa landing /${slug}/ và toàn bộ DB/leads của landing này?`)) return;
+      try {
+        await requestJson(`/api/landings/${encodeURIComponent(slug)}`, {
+          method: "DELETE",
+          body: JSON.stringify({ pin }),
+        });
+        await loadLandings();
+        setMessage(`Đã xóa /${slug}/.`);
+      } catch (err) {
+        setMessage(err.message || "Không xóa được landing.", true);
+      }
+    }
+
+    async function createLanding() {
+      const payload = {
+        pin: $("pin").value.trim(),
+        title: titleInput.value.trim(),
+        slug: slugInput.value.trim(),
+        source: sourceInput.value,
+        copy_from: $("copy-from").value,
+        html: $("html").value,
+      };
+      if (!payload.pin || !payload.slug) {
+        setMessage("Nhập PIN và slug trước.", true);
+        return;
+      }
+      try {
+        const data = await requestJson("/api/landings", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        await loadLandings();
+        setMessage(`Đã tạo /${data.landing.slug}/. Mở landing đó để sửa HTML/form như bình thường.`);
+      } catch (err) {
+        setMessage(err.message || "Không tạo được landing.", true);
+      }
+    }
+
+    syncSourceControls();
+    loadLandings();
+  </script>
+</body>
+</html>

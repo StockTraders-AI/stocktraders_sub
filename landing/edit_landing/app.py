@@ -10,7 +10,10 @@ from flask import Flask, abort, jsonify, redirect, request, send_from_directory
 
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
-VALID_SLUGS = {"1", "2", "3", "4", "5"}
+ADMIN_PIN = "9983"
+LEGACY_SLUGS = {"1", "2", "3", "4", "5"}
+SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
+RESERVED_SLUGS = {"api", "manager", "assets", "static", "style", "favicon"}
 RESERVED_COLUMNS = {"id", "ts"}
 DEFAULT_FORM_FIELDS = [
     {"key": "name", "label": "Họ và tên", "type": "text", "placeholder": "Nguyễn Văn A", "required": True, "position": 10},
@@ -21,14 +24,26 @@ DEFAULT_FORM_FIELDS = [
 app = Flask(__name__)
 
 
+def normalize_slug(value):
+    text = unicodedata.normalize("NFKD", clean(value)).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^a-zA-Z0-9-]+", "-", text).strip("-").lower()
+    text = re.sub(r"-+", "-", text)
+    return text[:64]
+
+
+def is_valid_slug(slug):
+    return bool(slug and SLUG_RE.fullmatch(slug) and slug not in RESERVED_SLUGS)
+
+
 def validate_slug(slug):
-    if slug not in VALID_SLUGS:
+    slug = normalize_slug(slug)
+    if not is_valid_slug(slug):
         abort(404)
     return slug
 
 
 def db_file_for(slug):
-    validate_slug(slug)
+    slug = validate_slug(slug)
     DATA_DIR.mkdir(exist_ok=True)
     return DATA_DIR / f"{slug}.db"
 
@@ -155,10 +170,78 @@ def get_db(slug):
     return conn
 
 
+def landing_slugs():
+    DATA_DIR.mkdir(exist_ok=True)
+    slugs = set(LEGACY_SLUGS)
+    for db_path in DATA_DIR.glob("*.db"):
+        slug = db_path.stem
+        if is_valid_slug(slug):
+            slugs.add(slug)
+    return sorted(slugs, key=lambda item: (not item.isdigit(), item))
+
+
 def init_all_dbs():
-    for slug in sorted(VALID_SLUGS):
+    for slug in landing_slugs():
         with get_db(slug) as conn:
             conn.commit()
+
+
+def setting_value(conn, key, default=""):
+    row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    return row["value"] if row else default
+
+
+def set_setting(conn, key, value):
+    conn.execute(
+        "INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)",
+        (key, clean(value)),
+    )
+
+
+def copy_public_template(src_slug, dst_slug):
+    with get_db(src_slug) as src, get_db(dst_slug) as dst:
+        page = src.execute(
+            "SELECT html, updated_at FROM page_content WHERE key = ?",
+            ("editable_html",),
+        ).fetchone()
+        dst.execute("DELETE FROM page_content WHERE key = ?", ("editable_html",))
+        if page:
+            dst.execute(
+                """
+                INSERT INTO page_content (key, html, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                ("editable_html", page["html"], datetime.now(timezone.utc).isoformat()),
+            )
+
+        fields = get_form_fields(src)
+        dst.execute("DELETE FROM form_fields")
+        for column in list(lead_columns(dst)):
+            if column not in RESERVED_COLUMNS:
+                drop_lead_column(dst, column)
+        now = datetime.now(timezone.utc).isoformat()
+        for index, field in enumerate(fields):
+            dst.execute(
+                """
+                INSERT INTO form_fields (key, label, type, placeholder, required, position, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    field["key"], field["label"], field["type"], field["placeholder"],
+                    1 if field["required"] else 0, (index + 1) * 10, now,
+                ),
+            )
+            ensure_lead_column(dst, field["key"])
+        set_setting(dst, "form_initialized", "1")
+        dst.commit()
+
+
+def delete_landing_files(slug):
+    base = db_file_for(slug)
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        path = base.with_name(base.name + suffix)
+        if path.exists():
+            path.unlink()
 
 
 def field_dict(row):
@@ -251,6 +334,99 @@ def drop_lead_column(conn, key):
         )
         """
     )
+
+
+@app.get("/manager")
+@app.get("/manager/")
+def manager():
+    return send_from_directory(BASE_DIR, "manager.html")
+
+
+@app.get("/api/landings")
+def list_landings():
+    items = []
+    for slug in landing_slugs():
+        with get_db(slug) as conn:
+            lead_count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
+            items.append({
+                "slug": slug,
+                "url": f"/{slug}/",
+                "title": setting_value(conn, "landing_title", slug),
+                "leads": lead_count,
+                "protected": slug == "1",
+            })
+    return jsonify({"landings": items})
+
+
+@app.delete("/api/landings/<slug>")
+def delete_landing(slug):
+    data = request.get_json(silent=True) or {}
+    if clean(data.get("pin")) != ADMIN_PIN:
+        return jsonify({"error": "Mã PIN không đúng."}), 403
+
+    slug = normalize_slug(slug)
+    if not is_valid_slug(slug):
+        return jsonify({"error": "Landing không hợp lệ."}), 400
+    if slug == "1":
+        return jsonify({"error": "Không xoá landing gốc /1/."}), 400
+
+    db_path = db_file_for(slug)
+    if not db_path.exists():
+        return jsonify({"error": "Landing không tồn tại."}), 404
+    delete_landing_files(slug)
+    return jsonify({"ok": True, "slug": slug})
+
+
+@app.post("/api/landings")
+def create_landing():
+    data = request.get_json(silent=True) or {}
+    if clean(data.get("pin")) != ADMIN_PIN:
+        return jsonify({"error": "Mã PIN không đúng."}), 403
+
+    slug = normalize_slug(data.get("slug") or data.get("title"))
+    if not is_valid_slug(slug):
+        return jsonify({"error": "Slug chỉ dùng chữ thường, số và dấu gạch ngang."}), 400
+
+    db_path = db_file_for(slug)
+    if db_path.exists():
+        return jsonify({"error": "Landing này đã tồn tại."}), 409
+
+    source = clean(data.get("source")) or "default"
+    copy_from = normalize_slug(data.get("copy_from"))
+    with get_db(slug) as conn:
+        set_setting(conn, "landing_title", data.get("title") or slug)
+        conn.commit()
+
+    if source == "copy":
+        if not is_valid_slug(copy_from) or not db_file_for(copy_from).exists():
+            db_path.unlink(missing_ok=True)
+            return jsonify({"error": "Landing nguồn để copy không tồn tại."}), 400
+        copy_public_template(copy_from, slug)
+        with get_db(slug) as conn:
+            set_setting(conn, "landing_title", data.get("title") or slug)
+            conn.commit()
+    elif source == "html":
+        html = data.get("html")
+        if isinstance(html, str) and html.strip():
+            with get_db(slug) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO page_content (key, html, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET html = excluded.html, updated_at = excluded.updated_at
+                    """,
+                    ("editable_html", html.strip(), datetime.now(timezone.utc).isoformat()),
+                )
+                conn.commit()
+
+    return jsonify({
+        "ok": True,
+        "landing": {
+            "slug": slug,
+            "url": f"/{slug}/",
+            "title": clean(data.get("title")) or slug,
+        },
+    }), 201
 
 
 @app.get("/")
@@ -510,7 +686,8 @@ def slug_fallback(slug, path):
 
 @app.get("/<path:path>")
 def fallback(path):
-    if path in VALID_SLUGS:
+    normalized = normalize_slug(path)
+    if normalized == path and is_valid_slug(path):
         return redirect(f"/{path}/", code=301)
     if path.startswith("api/"):
         return jsonify({"error": "Not found"}), 404
