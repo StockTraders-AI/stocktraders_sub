@@ -549,30 +549,29 @@ footer{
 }
 .custom-pasted-section,
 .custom-pasted-section.custom-pasted-section {
-  width: min(100% - 40px, 1120px) !important;
-  max-width: 1120px !important;
+  width: 100% !important;
+  max-width: none !important;
   min-height: auto !important;
-  margin: 40px auto !important;
-  padding-top: 24px !important;
-  padding-bottom: 24px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
   display: block !important;
   isolation: isolate;
-  overflow: hidden;
-}
-#editable-area > .custom-pasted-section:only-child {
-  width: 100% !important;
-  max-width: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  overflow: visible !important;
-}
-#editable-area > .custom-pasted-section:only-child > .pasted-document {
-  width: 100% !important;
-  max-width: none !important;
+  overflow: visible;
 }
 .custom-pasted-section > .pasted-document {
   width: 100%;
+  max-width: none !important;
   min-height: auto !important;
+}
+.custom-pasted-section > .pasted-document section,
+.custom-pasted-section > .pasted-document main,
+.custom-pasted-section > .pasted-document header,
+.custom-pasted-section > .pasted-document nav,
+.custom-pasted-section > .pasted-document footer {
+  max-width: none;
+  margin-left: 0;
+  margin-right: 0;
+  padding: 0;
 }
 .custom-pasted-section style {
   display: none !important;

@@ -816,7 +816,7 @@
     const scopeClass = "pasted-ui-" + Date.now().toString(36);
     const scopeSelector = "." + scopeClass + " .pasted-document";
     const scopedCss = styles.length ? scopeCss(styles.join("\n"), scopeSelector) : "";
-    const layoutGuard = `${scopeSelector}{min-height:auto!important;width:100%!important;max-width:100%!important;} ${scopeSelector} *{max-width:100%;}`;
+    const layoutGuard = `${scopeSelector}{min-height:auto!important;width:100%!important;max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
     const scopedStyle = `<style>${scopedCss}${layoutGuard}</style>`;
     return `<section class="custom-pasted-section ${scopeClass}">${scopedStyle}<div class="pasted-document">${bodyHtml}</div></section>`;
   }
