@@ -147,7 +147,7 @@
     function renderLandings() {
       $("count").textContent = landings.length + " landing";
       const copy = $("copy-from");
-      copy.innerHTML = landings.map((item) => `<option value="${item.slug}">/${item.slug}/</option>`).join("");
+      copy.innerHTML = landings.filter((item) => !item.system).map((item) => `<option value="${item.slug}">/${item.slug}/</option>`).join("");
       if (!landings.length) {
         $("list").innerHTML = '<div class="empty">Chưa có landing nào.</div>';
         return;
@@ -160,7 +160,7 @@
               <tr>
                 <td><code>/${item.slug}/</code></td>
                 <td>${escapeHtml(item.title || item.slug)}</td>
-                <td>${item.leads || 0}</td>
+                <td>${item.system ? "-" : (item.leads || 0)}</td>
                 <td style="text-align:right">
                   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
                     <a class="btn secondary" href="/${item.slug}/">Mở</a>

@@ -11,7 +11,7 @@ from flask import Flask, abort, jsonify, redirect, request, send_from_directory
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "data"
 ADMIN_PIN = "9983"
-LEGACY_SLUGS = {"1", "2", "3", "4", "5"}
+LEGACY_SLUGS = {"1"}
 SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$")
 RESERVED_SLUGS = {"api", "manager", "assets", "static", "style", "favicon"}
 RESERVED_COLUMNS = {"id", "ts"}
@@ -344,7 +344,14 @@ def manager():
 
 @app.get("/api/landings")
 def list_landings():
-    items = []
+    items = [{
+        "slug": "manager",
+        "url": "/manager/",
+        "title": "Manager",
+        "leads": 0,
+        "protected": True,
+        "system": True,
+    }]
     for slug in landing_slugs():
         with get_db(slug) as conn:
             lead_count = conn.execute("SELECT COUNT(*) FROM leads").fetchone()[0]
@@ -354,6 +361,7 @@ def list_landings():
                 "title": setting_value(conn, "landing_title", slug),
                 "leads": lead_count,
                 "protected": slug == "1",
+                "system": False,
             })
     return jsonify({"landings": items})
 
