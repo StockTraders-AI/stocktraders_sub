@@ -934,17 +934,9 @@
       renderFormFieldManager();
     } catch (err) {
       console.error("Không tải được cấu hình form:", err);
-      if (!formFields.length) {
-        formFields = [
-          { key: "name", label: "Họ và tên", type: "text", placeholder: "Nguyễn Văn A", required: true, protected: false },
-          { key: "phone", label: "Số điện thoại", type: "tel", placeholder: "0901 234 567", required: true, protected: false },
-          { key: "email", label: "Email", type: "email", placeholder: "email@example.com", required: false, protected: false },
-        ];
-      }
     }
     return formFields;
   }
-
   function fieldSelector(field) {
     const key = cssEscape(field.key);
     return `[data-field-key="${key}"], #${fieldInputId(field.key)}, [name="${key}"]`;
@@ -1108,14 +1100,31 @@
     return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><input class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" type="${type}" placeholder="${placeholder}"></div>`;
   }
 
+
+  function removeUnmanagedFormControls(container, used, activeKeys) {
+    const controls = Array.from(container.querySelectorAll("input, textarea, select"))
+      .filter((input) => !used.has(input) && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((input.type || "").toLowerCase()));
+    controls.forEach((input) => {
+      const key = input.dataset.fieldKey || inferCanonicalKey(labelForInput(input, container), input);
+      if (!activeKeys.has(key)) {
+        const row = input.closest(".form-row, [data-form-row], .field, .input-group");
+        if (row && row.querySelectorAll("input, textarea, select").length === 1) row.remove();
+        else input.remove();
+      }
+    });
+  }
   function ensureFormFields(root = document) {
-    if (!formFields.length) return;
     const container = getLeadFormContainer(root);
     if (!container) return;
+    if (!formFields.length) {
+      removeUnmanagedFormControls(container, new Set(), new Set());
+      return;
+    }
     const submit = container.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
     const err = container.querySelector?.("#form-error, .form-error, [data-form-error]");
     const insertBefore = err || submit;
     const used = new Set();
+    const activeKeys = new Set(formFields.map((field) => field.key));
 
     formFields.forEach((field) => {
       let el = findExistingFieldElement(field, container, used);
@@ -1137,6 +1146,8 @@
       if (row) row.dataset.formRow = field.key;
     });
 
+    removeUnmanagedFormControls(container, used, activeKeys);
+
     container.querySelectorAll("[data-field-key]").forEach((el) => {
       const key = el.dataset.fieldKey;
       if (!formFields.some((field) => field.key === key)) {
@@ -1146,7 +1157,6 @@
       }
     });
   }
-
   function ensureFormErrorBox(context, beforeEl) {
     let err = context?.querySelector?.("#form-error, .form-error, [data-form-error]") || document.getElementById("form-error");
     if (!err && beforeEl?.parentNode) {
@@ -1204,16 +1214,16 @@
     ensureFooterTrigger(root);
   }
 
-  function openFormFieldModal() {
+  async function openFormFieldModal() {
     document.getElementById("form-field-modal").style.display = "grid";
+    await loadFormFields();
     renderFormFieldManager();
     document.getElementById("new-field-label").focus();
   }
 
-  function openFormFieldManager() {
-    openFormFieldModal();
+  async function openFormFieldManager() {
+    await openFormFieldModal();
   }
-
   function closeFormFieldModal() {
     document.getElementById("form-field-modal").style.display = "none";
   }

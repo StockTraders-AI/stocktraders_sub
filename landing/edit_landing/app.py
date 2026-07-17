@@ -21,7 +21,6 @@ RESERVED_COLUMNS = {"id", "ts"}
 DEFAULT_FORM_FIELDS = [
     {"key": "name", "label": "Họ và tên", "type": "text", "placeholder": "Nguyễn Văn A", "required": True, "position": 10},
     {"key": "phone", "label": "Số điện thoại", "type": "tel", "placeholder": "0901 234 567", "required": True, "position": 20},
-    {"key": "email", "label": "Email", "type": "email", "placeholder": "email@example.com", "required": False, "position": 30},
 ]
 
 app = Flask(__name__)
@@ -319,6 +318,41 @@ def delete_landing_files(slug):
     return False, str(last_error or "Không xoá được DB.")
 
 
+def rename_landing_files(old_slug, new_slug):
+    old_base = db_file_for(old_slug)
+    new_base = db_file_for(new_slug)
+    old_paths = [old_base.with_name(old_base.name + suffix) for suffix in ("", "-wal", "-shm", "-journal")]
+    new_paths = [new_base.with_name(new_base.name + suffix) for suffix in ("", "-wal", "-shm", "-journal")]
+    if not old_base.exists():
+        return False, "Landing không tồn tại."
+    if any(path.exists() for path in new_paths):
+        return False, "Slug mới đã tồn tại."
+
+    renamed = []
+    last_error = None
+    for _ in range(6):
+        gc.collect()
+        try:
+            for old_path, new_path in zip(old_paths, new_paths):
+                if old_path.exists():
+                    old_path.rename(new_path)
+                    renamed.append((old_path, new_path))
+            return True, ""
+        except PermissionError as exc:
+            last_error = exc
+            time.sleep(0.15)
+        except OSError as exc:
+            last_error = exc
+            break
+
+    for old_path, new_path in reversed(renamed):
+        if new_path.exists() and not old_path.exists():
+            try:
+                new_path.rename(old_path)
+            except OSError:
+                pass
+    return False, str(last_error or "Không đổi được slug.")
+
 def field_dict(row):
     data = dict(row)
     data["required"] = bool(data.get("required"))
@@ -440,6 +474,39 @@ def list_landings():
             })
     return jsonify({"landings": items})
 
+
+
+@app.patch("/api/landings/<slug>")
+def rename_landing(slug):
+    data = request.get_json(silent=True) or {}
+    if clean(data.get("pin")) != ADMIN_PIN:
+        return jsonify({"error": "Mã PIN không đúng."}), 403
+
+    old_slug = normalize_slug(slug)
+    new_slug = normalize_slug(data.get("slug") or data.get("new_slug"))
+    title = clean(data.get("title"))
+
+    if not is_valid_slug(old_slug) or not is_valid_slug(new_slug):
+        return jsonify({"error": "Slug chỉ dùng chữ thường, số và dấu gạch ngang."}), 400
+    if old_slug in {"1", "manager"}:
+        return jsonify({"error": "Không thể sửa slug landing hệ thống."}), 400
+    if old_slug == new_slug:
+        with get_db(old_slug) as conn:
+            if title:
+                set_setting(conn, "landing_title", title)
+                conn.commit()
+        return jsonify({"ok": True, "landing": {"slug": old_slug, "url": f"/{old_slug}/", "title": title or old_slug}})
+
+    renamed, error = rename_landing_files(old_slug, new_slug)
+    if not renamed:
+        status = 409 if "tồn tại" in error else 423
+        return jsonify({"error": error}), status
+
+    with get_db(new_slug) as conn:
+        set_setting(conn, "landing_title", title or new_slug)
+        conn.commit()
+
+    return jsonify({"ok": True, "landing": {"slug": new_slug, "url": f"/{new_slug}/", "title": title or new_slug}, "old_slug": old_slug})
 
 @app.delete("/api/landings/<slug>")
 def delete_landing(slug):

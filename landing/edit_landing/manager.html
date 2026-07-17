@@ -164,7 +164,7 @@
                 <td style="text-align:right">
                   <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
                     <a class="btn secondary" href="/${item.slug}/">Mở</a>
-                    ${item.protected ? "" : `<button type="button" class="secondary danger" onclick="deleteLanding('${item.slug}')">Xóa</button>`}
+                    ${item.protected ? "" : `<button type="button" class="secondary" onclick="editLanding('${escapeJs(item.slug)}', '${escapeJs(item.title || item.slug)}')">Sửa URL</button><button type="button" class="secondary danger" onclick="deleteLanding('${escapeJs(item.slug)}')">Xóa</button>`}
                   </div>
                 </td>
               </tr>`).join("")}
@@ -176,6 +176,10 @@
       return String(value || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
     }
 
+
+    function escapeJs(value) {
+      return String(value || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    }
     async function loadLandings() {
       try {
         const data = await requestJson("/api/landings");
@@ -187,6 +191,34 @@
       }
     }
 
+
+    async function editLanding(slug, currentTitle) {
+      const pin = $("pin").value.trim();
+      if (!pin) {
+        setMessage("Nhập PIN trước khi sửa URL.", true);
+        return;
+      }
+      const nextSlugRaw = prompt(`Slug mới cho /${slug}/`, slug);
+      if (nextSlugRaw === null) return;
+      const nextSlug = slugify(nextSlugRaw);
+      if (!nextSlug) {
+        setMessage("Slug mới không hợp lệ.", true);
+        return;
+      }
+      const nextTitle = prompt("Tên landing", currentTitle || nextSlug);
+      if (nextTitle === null) return;
+      if (nextSlug !== slug && !confirm(`Đổi /${slug}/ thành /${nextSlug}/? DB/leads sẽ được giữ nguyên.`)) return;
+      try {
+        const data = await requestJson(`/api/landings/${encodeURIComponent(slug)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ pin, slug: nextSlug, title: nextTitle.trim() || nextSlug }),
+        });
+        await loadLandings();
+        setMessage(`Đã cập nhật thành /${data.landing.slug}/.`);
+      } catch (err) {
+        setMessage(err.message || "Không sửa được URL landing.", true);
+      }
+    }
     async function deleteLanding(slug) {
       const pin = $("pin").value.trim();
       if (!pin) {
