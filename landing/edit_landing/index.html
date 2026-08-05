@@ -895,6 +895,57 @@
       return !!container?.querySelector?.("input:not([type='hidden']), textarea, select, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
     });
   }
+  function cssDefinesSelectorProperty(css, selectorToken, property) {
+    const source = String(css || "").replace(/\/\*[\s\S]*?\*\//g, "");
+    const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const propRe = new RegExp(`(^|[;\\s])${escaped}\\s*:`, "i");
+    let i = 0;
+    while (i < source.length) {
+      const open = source.indexOf("{", i);
+      if (open === -1) return false;
+      const close = findMatchingBrace(source, open);
+      if (close === -1) return false;
+      const head = source.slice(i, open);
+      const body = source.slice(open + 1, close);
+      if (!head.trim().startsWith("@") && head.includes(selectorToken) && propRe.test(body)) return true;
+      i = close + 1;
+    }
+    return false;
+  }
+
+  function inheritedHeroReset(css, scopeSelector) {
+    const resetProps = {
+      "min-height": "auto",
+      "display": "block",
+      "flex-direction": "initial",
+      "align-items": "initial",
+      "justify-content": "initial",
+      "text-align": "initial",
+      "overflow": "visible"
+    };
+    const rules = Object.entries(resetProps)
+      .filter(([property]) => !cssDefinesSelectorProperty(css, ".hero", property))
+      .map(([property, value]) => `${property}:${value}!important;`);
+    return rules.length ? `${scopeSelector} .hero{${rules.join("")}}` : "";
+  }
+  function ensureImportedHeroIsolation(root = document) {
+    const area = getEditableArea();
+    if (root !== area || !area?.querySelector?.(".hero")) return;
+    const scopedCss = Array.from(area.children)
+      .filter((el) => el.tagName === "STYLE" && (el.textContent || "").includes("#editable-area"))
+      .map((el) => el.textContent || "")
+      .join("\n");
+    if (!scopedCss) return;
+    const resetCss = inheritedHeroReset(scopedCss, "#editable-area");
+    if (!resetCss) return;
+    let guard = area.querySelector("style[data-import-layout-guard]");
+    if (!guard) {
+      guard = document.createElement("style");
+      guard.setAttribute("data-import-layout-guard", "1");
+      area.prepend(guard);
+    }
+    guard.textContent = resetCss;
+  }
   function extractHtmlForEditableArea(rawHtml, mode = "append") {
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHtml, "text/html");
@@ -922,8 +973,9 @@
 
     if (mode === "replace") {
       const scopeSelector = "#editable-area";
-      const scopedCss = styles.length ? scopeCss(styles.join("\n"), scopeSelector) : "";
-      const layoutGuard = `${scopeSelector}{width:100%!important;max-width:none!important;margin:0!important;} ${scopeSelector} .reveal{opacity:1!important;transform:none!important;} ${scopeSelector} > nav{max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}`;
+      const sourceCss = styles.join("\n");
+      const scopedCss = sourceCss ? scopeCss(sourceCss, scopeSelector) : "";
+      const layoutGuard = `${scopeSelector}{width:100%!important;max-width:none!important;margin:0!important;} ${scopeSelector} .reveal{opacity:1!important;transform:none!important;} ${scopeSelector} > nav{max-width:none!important;} ${scopeSelector} img, ${scopeSelector} video, ${scopeSelector} canvas, ${scopeSelector} svg{max-width:100%;}${inheritedHeroReset(sourceCss, scopeSelector)}`;
       const scopedStyle = scopedCss ? `<style>${scopedCss}${layoutGuard}</style>` : `<style>${layoutGuard}</style>`;
       return `${scopedStyle}${bodyHtml}`;
     }
@@ -1259,6 +1311,7 @@
   function bindLandingRuntime(root = document) {
     if (root === getEditableArea()) removePublicAdminPanels(root);
     materializeTemplateLogos(root);
+    ensureImportedHeroIsolation(root);
     activateRevealBlocks(root);
     if (hasLeadFormMarkup(root)) normalizeLeadForm(root);
     ensureFooterTrigger(root);
