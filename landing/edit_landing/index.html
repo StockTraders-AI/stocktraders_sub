@@ -850,6 +850,51 @@
       });
     });
   }
+  function extractDefaultLogoSrc(rawHtml) {
+    const match = String(rawHtml || "").match(/const\s+DEFAULT_LOGO\s*=\s*(['"])(data:image\/[^'"]+)\1/);
+    return match?.[2] || "";
+  }
+
+  function materializeTemplateLogos(root, rawHtml = "") {
+    if (!root?.querySelectorAll) return;
+    const defaultLogo = extractDefaultLogoSrc(rawHtml);
+    const template = root.querySelector("template#logo-svg");
+    root.querySelectorAll(".logo-slot").forEach((slot) => {
+      if (slot.children.length || slot.textContent.trim()) return;
+      if (defaultLogo) {
+        const img = document.createElement("img");
+        img.className = "logo";
+        img.src = defaultLogo;
+        img.alt = "StockTraders";
+        slot.appendChild(img);
+        slot.closest(".brand")?.classList.add("has-custom");
+        return;
+      }
+      const logo = template?.content?.firstElementChild?.cloneNode(true);
+      if (logo) slot.appendChild(logo);
+    });
+  }
+
+  function hasLeadFormMarkup(root = document) {
+    const scope = root || document;
+    const candidates = Array.from(scope.querySelectorAll?.([
+      "form",
+      ".form-box",
+      ".signup-box",
+      ".form-section",
+      "[data-lead-form]",
+      "#form-submit-btn",
+      ".form-submit",
+      ".signup-btn"
+    ].join(",")) || []);
+    return candidates.some((el) => {
+      if (el.closest?.("#admin-panel")) return false;
+      const container = el.matches?.("button, input[type='submit'], .form-submit, .signup-btn")
+        ? el.closest("form, .form-box, .signup-box, .form-section, section, div")
+        : el;
+      return !!container?.querySelector?.("input:not([type='hidden']), textarea, select, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
+    });
+  }
   function extractHtmlForEditableArea(rawHtml, mode = "append") {
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHtml, "text/html");
@@ -869,6 +914,7 @@
       });
     }
 
+    materializeTemplateLogos(container, rawHtml);
     container.querySelectorAll("script, meta, title, base").forEach((el) => el.remove());
     removePublicAdminPanels(container);
     removeInlineHandlers(container);
@@ -909,6 +955,9 @@
       }
     }
 
+    if (mode === "replace" && !hasLeadFormMarkup(area) && formFields.length) {
+      await syncDetectedFormFields([]);
+    }
     input.value = "";
     closeHtmlPaste();
     bindLandingRuntime(area);
@@ -1209,8 +1258,9 @@
 
   function bindLandingRuntime(root = document) {
     if (root === getEditableArea()) removePublicAdminPanels(root);
+    materializeTemplateLogos(root);
     activateRevealBlocks(root);
-    normalizeLeadForm(root);
+    if (hasLeadFormMarkup(root)) normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
 

@@ -263,6 +263,22 @@ def sanitize_landing_html(html):
     return source.strip()
 
 
+def html_has_lead_form(html):
+    source = sanitize_landing_html(html)
+    source = re.sub(r"(?is)<[^>]*(?:id|class)\s*=\s*(['\"])[^'\"]*admin[^'\"]*\1[^>]*>.*?</[^>]+>", "", source)
+    return bool(re.search(
+        r"(?is)<form\b|<(?:input|textarea|select)\b|type\s*=\s*(['\"]?)submit\1|\b(?:form-submit|signup-btn)\b",
+        source,
+    ))
+
+
+def clear_form_fields(conn):
+    conn.execute("DELETE FROM form_fields")
+    for column in list(lead_columns(conn)):
+        if column not in RESERVED_COLUMNS:
+            drop_lead_column(conn, column)
+    set_setting(conn, "form_initialized", "1")
+
 def copy_public_template(src_slug, dst_slug):
     with get_db(src_slug) as src, get_db(dst_slug) as dst:
         page = src.execute(
@@ -560,6 +576,7 @@ def create_landing():
     elif source == "html":
         html = data.get("html")
         if isinstance(html, str) and html.strip():
+            sanitized_html = sanitize_landing_html(html)
             with get_db(slug) as conn:
                 conn.execute(
                     """
@@ -567,8 +584,10 @@ def create_landing():
                     VALUES (?, ?, ?)
                     ON CONFLICT(key) DO UPDATE SET html = excluded.html, updated_at = excluded.updated_at
                     """,
-                    ("editable_html", sanitize_landing_html(html), datetime.now(timezone.utc).isoformat()),
+                    ("editable_html", sanitized_html, datetime.now(timezone.utc).isoformat()),
                 )
+                if not html_has_lead_form(sanitized_html):
+                    clear_form_fields(conn)
                 conn.commit()
 
     return jsonify({
