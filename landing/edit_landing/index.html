@@ -1284,6 +1284,48 @@
     }
   }
 
+  function normalizedActionText(el) {
+    return String(el?.textContent || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
+  }
+
+  function scrollToLandingTarget(targetId) {
+    const target = document.getElementById(targetId);
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function inferLandingCtaTarget(el) {
+    const text = normalizedActionText(el);
+    const classes = String(el?.className || "");
+    const href = el?.getAttribute?.("href") || "";
+    if (/^#[A-Za-z][\w:-]*$/.test(href)) return href.slice(1);
+    if (classes.includes("nav-cta") || classes.includes("btn-primary") || classes.includes("price-btn-primary")) return "register";
+    if (classes.includes("btn-secondary") && document.getElementById("features")) return "features";
+    if (/dang ky|uu dai|khoa gia|tu van|lien he|nhan thong tin|mo khoa/.test(text)) return "register";
+    if (/kham pha|tinh nang|xem them|chi tiet/.test(text) && document.getElementById("features")) return "features";
+    if (/bang gia|goi|pricing/.test(text) && document.getElementById("pricing")) return "pricing";
+    return "";
+  }
+
+  function bindLandingCtas(root = document) {
+    const area = getEditableArea();
+    const scope = root || document;
+    scope.querySelectorAll?.("button, a, [role='button']").forEach((el) => {
+      if (!area?.contains(el) || el.closest("#admin-panel")) return;
+      if (el.matches("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn")) return;
+      const targetId = inferLandingCtaTarget(el);
+      if (!targetId || !document.getElementById(targetId)) return;
+      if (el.tagName?.toLowerCase() === "button" && !el.getAttribute("type")) el.setAttribute("type", "button");
+      el.onclick = (event) => {
+        event.preventDefault();
+        scrollToLandingTarget(targetId);
+      };
+    });
+  }
   function ensureFooterTrigger(root = document) {
     const area = getEditableArea();
     const footer = (root || document).querySelector?.("footer") || area?.querySelector("footer");
@@ -1313,6 +1355,7 @@
     materializeTemplateLogos(root);
     ensureImportedHeroIsolation(root);
     activateRevealBlocks(root);
+    bindLandingCtas(root);
     if (hasLeadFormMarkup(root)) normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
@@ -1656,19 +1699,47 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+  function parseCountdownDate(root = document) {
+    const scope = root || document;
+    const explicit = scope.querySelector?.("[data-countdown-date]")?.getAttribute("data-countdown-date")
+      || scope.querySelector?.("time[datetime]")?.getAttribute("datetime");
+    if (explicit) {
+      const parsed = new Date(explicit);
+      if (!isNaN(parsed)) return parsed;
+    }
+
+    const label = scope.querySelector?.("#countdown-live .countdown-label, .countdown-label")?.textContent || "";
+    const match = label.match(/(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);
+    if (match) {
+      const day = match[1].padStart(2, "0");
+      const month = match[2].padStart(2, "0");
+      return new Date(`${match[3]}-${month}-${day}T00:00:00+07:00`);
+    }
+    return new Date("2026-08-02T00:00:00+07:00");
+  }
+
   function updateCountdown() {
-    const launch = new Date("2026-08-02T00:00:00+07:00");
+    const area = getEditableArea() || document;
+    const launch = parseCountdownDate(area);
     const now = new Date();
     const diff = launch - now;
+    const liveEl = document.getElementById("countdown-live");
+    const doneEl = document.getElementById("countdown-done");
     const dEl = document.getElementById("cd-d");
     const hEl = document.getElementById("cd-h");
     const mEl = document.getElementById("cd-m");
     const sEl = document.getElementById("cd-s");
-    if (!dEl) return;
-    if (diff <= 0) {
+    if (!dEl || !hEl || !mEl || !sEl) return;
+    if (diff <= 0 || isNaN(diff)) {
+      if (liveEl && doneEl) {
+        liveEl.style.display = "none";
+        doneEl.style.display = "block";
+      }
       dEl.textContent = hEl.textContent = mEl.textContent = sEl.textContent = "00";
       return;
     }
+    if (liveEl) liveEl.style.display = "block";
+    if (doneEl) doneEl.style.display = "none";
     const d = Math.floor(diff / 86400000);
     const h = Math.floor((diff % 86400000) / 3600000);
     const m = Math.floor((diff % 3600000) / 60000);
