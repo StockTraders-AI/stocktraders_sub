@@ -1579,7 +1579,7 @@
     if (thead) {
       thead.innerHTML = `<tr style="text-align:left;color:var(--t3);border-bottom:.5px solid var(--bdr)">
         <th style="padding:8px 10px">Thời gian</th>
-        ${activeFields.map((field) => `<th style="padding:8px 10px">${escapeHtml(field.label)}</th>`).join("")}
+        ${activeFields.map((field) => `<th style="padding:8px 10px${field.key === "name" ? ";min-width:170px" : ""}">${escapeHtml(field.label)}</th>`).join("")}
         <th style="padding:8px 10px"></th>
       </tr>`;
     }
@@ -1594,7 +1594,7 @@
       const dateStr = isNaN(d) ? "" : d.toLocaleString("vi-VN");
       return `<tr style="border-bottom:.5px solid var(--bdr)">
         <td style="padding:9px 10px;color:var(--t3);white-space:nowrap">${dateStr}</td>
-        ${activeFields.map((field) => `<td style="padding:9px 10px;color:var(--t2)">${escapeHtml(lead[field.key] || "")}</td>`).join("")}
+        ${activeFields.map((field) => `<td style="padding:9px 10px;color:var(--t2)${field.key === "name" ? ";min-width:170px;white-space:nowrap" : ""}">${escapeHtml(lead[field.key] || "")}</td>`).join("")}
         <td style="padding:9px 10px;text-align:right"><button onclick="deleteLead('${lead.id}')" style="background:none;border:none;color:var(--R);cursor:pointer;font-size:12px"><i class="ti ti-trash"></i></button></td>
       </tr>`;
     }).join("");
