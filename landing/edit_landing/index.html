@@ -1184,25 +1184,17 @@
     return firstInput?.closest("form, .form-box, .signup-box, .form-section, section, div") || scope;
   }
 
-  function findExistingFieldElement(field, container, used = new Set()) {
-    let el = container.querySelector?.(fieldSelector(field));
-    if (el && !used.has(el)) return el;
-    if (field.key === "name") {
-      el = container.querySelector?.("#lead-name, [name='name'], [name='fullname'], [name='full_name'], [name*='ten' i], [name*='name' i]");
-    } else if (field.key === "phone") {
-      el = container.querySelector?.("#lead-phone, input[type='tel'], [name='phone'], [name*='phone' i], [name*='sdt' i], [name*='dien-thoai' i]");
-    } else if (field.key === "email") {
-      el = container.querySelector?.("#lead-email, [name='email'], [name*='email' i], [name*='mail' i]");
-    } else if (field.key === "capital") {
-      el = container.querySelector?.("#lead-capital, [name='capital'], [name*='capital' i], [name*='investment' i], [name*='von' i]");
-    }
-    if (el && !used.has(el)) return el;
+  function expectedTagForFieldType(type) {
+    if (type === "textarea") return "textarea";
+    if (type === "select") return "select";
+    return "input";
+  }
 
-    const candidates = Array.from(container.querySelectorAll("input, textarea, select"))
-      .filter((input) => !used.has(input) && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((input.type || "").toLowerCase()));
-    el = candidates.find((input) => inferCanonicalKey(labelForInput(input, container), input) === field.key) || null;
-    if (el && !used.has(el)) return el;
-    return null;
+  function findExistingFieldElement(field, container, used = new Set()) {
+    const el = container.querySelector?.(fieldSelector(field));
+    if (!el || used.has(el)) return null;
+    if (el.tagName.toLowerCase() !== expectedTagForFieldType(field.type)) return null;
+    return el;
   }
 
   function fieldRowHtml(field) {
@@ -1224,34 +1216,35 @@
   }
 
 
-  function removeUnmanagedFormControls(container, used, activeKeys) {
+  function removeUnmanagedFormControls(container, used) {
     const controls = Array.from(container.querySelectorAll("input, textarea, select"))
       .filter((input) => !used.has(input) && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((input.type || "").toLowerCase()));
     controls.forEach((input) => {
-      const key = input.dataset.fieldKey || inferCanonicalKey(labelForInput(input, container), input);
-      if (!activeKeys.has(key)) {
-        const row = input.closest(".form-row, [data-form-row], .field, .input-group");
-        if (row && row.querySelectorAll("input, textarea, select").length === 1) row.remove();
-        else input.remove();
-      }
+      const row = input.closest(".form-row, [data-form-row], .field, .input-group");
+      if (row && row.querySelectorAll("input, textarea, select").length === 1) row.remove();
+      else input.remove();
     });
   }
   function ensureFormFields(root = document) {
     const container = getLeadFormContainer(root);
     if (!container) return;
     if (!formFields.length) {
-      removeUnmanagedFormControls(container, new Set(), new Set());
+      removeUnmanagedFormControls(container, new Set());
       return;
     }
     const submit = container.querySelector?.("#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn");
     const err = container.querySelector?.("#form-error, .form-error, [data-form-error]");
     const insertBefore = err || submit;
     const used = new Set();
-    const activeKeys = new Set(formFields.map((field) => field.key));
 
     formFields.forEach((field) => {
       let el = findExistingFieldElement(field, container, used);
       if (!el) {
+        const stale = container.querySelector(fieldSelector(field));
+        if (stale && !used.has(stale)) {
+          const staleRow = stale.closest(".form-row, [data-form-row]");
+          (staleRow || stale).remove();
+        }
         if (insertBefore?.parentNode) {
           insertBefore.insertAdjacentHTML("beforebegin", fieldRowHtml(field));
         } else {
@@ -1264,12 +1257,12 @@
       el.dataset.fieldKey = field.key;
       el.name = field.key;
       if (!el.id) el.id = fieldInputId(field.key);
-      if (!el.placeholder && field.placeholder) el.placeholder = field.placeholder;
+      if (field.type !== "select" && !el.placeholder && field.placeholder) el.placeholder = field.placeholder;
       const row = el.closest(".form-row, [data-form-row]");
       if (row) row.dataset.formRow = field.key;
     });
 
-    removeUnmanagedFormControls(container, used, activeKeys);
+    removeUnmanagedFormControls(container, used);
 
     container.querySelectorAll("[data-field-key]").forEach((el) => {
       const key = el.dataset.fieldKey;
