@@ -142,6 +142,7 @@ def create_base_tables(conn):
             placeholder TEXT NOT NULL DEFAULT '',
             required INTEGER NOT NULL DEFAULT 0,
             position INTEGER NOT NULL DEFAULT 0,
+            options TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         )
         """
@@ -198,8 +199,15 @@ def ensure_default_form_fields(conn):
     )
 
 
+def ensure_form_fields_options_column(conn):
+    columns = [row[1] for row in conn.execute("PRAGMA table_info(form_fields)").fetchall()]
+    if "options" not in columns:
+        conn.execute("ALTER TABLE form_fields ADD COLUMN options TEXT NOT NULL DEFAULT ''")
+
+
 def ensure_schema(conn):
     create_base_tables(conn)
+    ensure_form_fields_options_column(conn)
     ensure_default_form_fields(conn)
     for key in [row[0] for row in conn.execute("SELECT key FROM form_fields")]:
         ensure_lead_column(conn, key)
@@ -304,12 +312,13 @@ def copy_public_template(src_slug, dst_slug):
         for index, field in enumerate(fields):
             dst.execute(
                 """
-                INSERT INTO form_fields (key, label, type, placeholder, required, position, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO form_fields (key, label, type, placeholder, required, position, options, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     field["key"], field["label"], field["type"], field["placeholder"],
-                    1 if field["required"] else 0, (index + 1) * 10, now,
+                    1 if field["required"] else 0, (index + 1) * 10,
+                    options_to_text(field.get("options")), now,
                 ),
             )
             ensure_lead_column(dst, field["key"])
@@ -369,16 +378,32 @@ def rename_landing_files(old_slug, new_slug):
                 pass
     return False, str(last_error or "Không đổi được slug.")
 
+def options_to_text(options):
+    if isinstance(options, str):
+        items = options.splitlines()
+    elif isinstance(options, (list, tuple)):
+        items = [clean(item) for item in options]
+    else:
+        items = []
+    items = [clean(item) for item in items if clean(item)]
+    return "\n".join(items[:50])
+
+
+def options_from_text(text):
+    return [line for line in clean(text).splitlines() if line]
+
+
 def field_dict(row):
     data = dict(row)
     data["required"] = bool(data.get("required"))
+    data["options"] = options_from_text(data.pop("options", ""))
     data["protected"] = False
     return data
 
 
 def get_form_fields(conn):
     rows = conn.execute(
-        "SELECT key, label, type, placeholder, required, position FROM form_fields ORDER BY position, created_at, key"
+        "SELECT key, label, type, placeholder, required, position, options FROM form_fields ORDER BY position, created_at, key"
     ).fetchall()
     return [field_dict(row) for row in rows]
 
@@ -413,13 +438,17 @@ def stable_field_key(conn, label, requested_key=None, current_key=None):
     return key
 
 
+FIELD_TYPES = {"text", "tel", "email", "number", "date", "textarea", "select"}
+
+
 def normalize_field_payload(field, fallback_position):
     label = clean(field.get("label"))
     if not label:
         return None
     input_type = clean(field.get("type")) or "text"
-    if input_type not in {"text", "tel", "email", "number", "date", "textarea"}:
+    if input_type not in FIELD_TYPES:
         input_type = "text"
+    options = options_to_text(field.get("options")) if input_type == "select" else ""
     return {
         "key": normalize_key(field.get("key") or label),
         "label": label,
@@ -427,6 +456,7 @@ def normalize_field_payload(field, fallback_position):
         "placeholder": clean(field.get("placeholder")),
         "required": bool(field.get("required")),
         "position": int(field.get("position") or fallback_position),
+        "options": options,
     }
 
 
@@ -718,12 +748,12 @@ def replace_form_fields(slug):
             ensure_lead_column(conn, key)
             conn.execute(
                 """
-                INSERT INTO form_fields (key, label, type, placeholder, required, position, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO form_fields (key, label, type, placeholder, required, position, options, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     key, item["label"], item["type"], item["placeholder"],
-                    1 if item["required"] else 0, (index + 1) * 10, now,
+                    1 if item["required"] else 0, (index + 1) * 10, item["options"], now,
                 ),
             )
 
@@ -748,20 +778,21 @@ def add_form_field(slug):
     if not label:
         return jsonify({"error": "Vui lòng nhập tên trường."}), 400
     input_type = clean(data.get("type")) or "text"
-    if input_type not in {"text", "tel", "email", "number", "date", "textarea"}:
+    if input_type not in FIELD_TYPES:
         input_type = "text"
     placeholder = clean(data.get("placeholder"))
     required = bool(data.get("required"))
+    options = options_to_text(data.get("options")) if input_type == "select" else ""
     now = datetime.now(timezone.utc).isoformat()
     with get_db(slug) as conn:
         key = unique_field_key(conn, label)
         max_pos = conn.execute("SELECT COALESCE(MAX(position), 0) FROM form_fields").fetchone()[0]
         conn.execute(
             """
-            INSERT INTO form_fields (key, label, type, placeholder, required, position, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO form_fields (key, label, type, placeholder, required, position, options, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (key, label, input_type, placeholder, 1 if required else 0, max_pos + 10, now),
+            (key, label, input_type, placeholder, 1 if required else 0, max_pos + 10, options, now),
         )
         ensure_lead_column(conn, key)
         conn.commit()
@@ -778,10 +809,11 @@ def update_form_field(slug, field_key):
     if not label:
         return jsonify({"error": "Vui lòng nhập tên trường."}), 400
     input_type = clean(data.get("type")) or "text"
-    if input_type not in {"text", "tel", "email", "number", "date", "textarea"}:
+    if input_type not in FIELD_TYPES:
         input_type = "text"
     placeholder = clean(data.get("placeholder"))
     required = bool(data.get("required"))
+    options = options_to_text(data.get("options")) if input_type == "select" else ""
 
     with get_db(slug) as conn:
         row = conn.execute("SELECT key FROM form_fields WHERE key = ?", (key,)).fetchone()
@@ -790,10 +822,10 @@ def update_form_field(slug, field_key):
         conn.execute(
             """
             UPDATE form_fields
-            SET label = ?, type = ?, placeholder = ?, required = ?
+            SET label = ?, type = ?, placeholder = ?, required = ?, options = ?
             WHERE key = ?
             """,
-            (label, input_type, placeholder, 1 if required else 0, key),
+            (label, input_type, placeholder, 1 if required else 0, options, key),
         )
         conn.commit()
         fields = get_form_fields(conn)

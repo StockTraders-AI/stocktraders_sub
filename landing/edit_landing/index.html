@@ -39,17 +39,20 @@
         <label class="form-label">Tên trường</label>
         <input class="form-input" id="new-field-label" type="text" placeholder="Ví dụ: Vốn đầu tư">
         <label class="form-label">Kiểu nhập</label>
-        <select class="form-select" id="new-field-type">
+        <select class="form-select" id="new-field-type" onchange="toggleNewFieldOptions()">
           <option value="text">Text</option>
           <option value="tel">Số điện thoại</option>
           <option value="email">Email</option>
           <option value="number">Số</option>
           <option value="date">Ngày</option>
           <option value="textarea">Textarea</option>
+          <option value="select">Lựa chọn (select)</option>
         </select>
         <label class="form-label">Placeholder</label>
         <input class="form-input" id="new-field-placeholder" type="text" placeholder="Ví dụ: 500 triệu">
         <label class="form-field-check"><input id="new-field-required" type="checkbox"> Bắt buộc nhập</label>
+        <label class="form-label" id="new-field-options-label" style="display:none">Danh sách lựa chọn (mỗi dòng 1 giá trị)</label>
+        <textarea class="form-input" id="new-field-options" rows="4" style="display:none" placeholder="Dưới 100 triệu&#10;100 - 500 triệu&#10;500 triệu - 1 tỷ"></textarea>
       </div>
       <div class="html-paste-actions" style="justify-content:space-between">
         <button type="button" onclick="addFormField()">Thêm trường</button>
@@ -1105,10 +1108,20 @@
 
   function inferInputType(el) {
     if (!el) return "text";
-    if (el.tagName?.toLowerCase() === "textarea") return "textarea";
+    const tag = el.tagName?.toLowerCase();
+    if (tag === "textarea") return "textarea";
+    if (tag === "select") return "select";
     const type = (el.type || "text").toLowerCase();
     if (["tel", "email", "number", "date"].includes(type)) return type;
     return "text";
+  }
+
+  function extractSelectOptions(el) {
+    if (el?.tagName?.toLowerCase() !== "select") return [];
+    return Array.from(el.options || [])
+      .filter((opt) => opt.value)
+      .map((opt) => (opt.textContent || opt.value || "").trim())
+      .filter(Boolean);
   }
 
   function detectFormFieldsFromRoot(root = document) {
@@ -1120,17 +1133,20 @@
     return controls.map((el, index) => {
       const label = labelForInput(el, container);
       const key = inferCanonicalKey(label, el);
+      const type = inferInputType(el);
       const field = {
         key,
         label: label || `Trường ${index + 1}`,
-        type: inferInputType(el),
+        type,
         placeholder: el.placeholder || "",
         required: !!el.required || /\*/.test(labelForInput(el, container)),
         position: (index + 1) * 10,
+        options: type === "select" ? extractSelectOptions(el) : undefined,
       };
       return field;
     }).filter((field) => {
       if (!field.label || seen.has(field.key)) return false;
+      if (field.type === "select" && !field.options.length) return false;
       seen.add(field.key);
       return true;
     });
@@ -1197,6 +1213,12 @@
     const type = ["text", "tel", "email", "number", "date"].includes(field.type) ? field.type : "text";
     if (field.type === "textarea") {
       return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><textarea class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" placeholder="${placeholder}" rows="3"></textarea></div>`;
+    }
+    if (field.type === "select") {
+      const options = Array.isArray(field.options) ? field.options : [];
+      const placeholderLabel = escapeHtml(field.placeholder || `Chọn ${field.label}`);
+      const optionsHtml = options.map((opt) => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join("");
+      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><select class="form-select" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}"><option value="" selected disabled>${placeholderLabel}</option>${optionsHtml}</select></div>`;
     }
     return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><input class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" type="${type}" placeholder="${placeholder}"></div>`;
   }
@@ -1374,6 +1396,26 @@
     document.getElementById("form-field-modal").style.display = "none";
   }
 
+  function optionsToLines(options) {
+    return Array.isArray(options) ? options.join("\n") : "";
+  }
+
+  function linesToOptions(text) {
+    return String(text || "").split("\n").map((line) => line.trim()).filter(Boolean);
+  }
+
+  function toggleNewFieldOptions() {
+    const isSelect = document.getElementById("new-field-type")?.value === "select";
+    document.getElementById("new-field-options-label").style.display = isSelect ? "block" : "none";
+    document.getElementById("new-field-options").style.display = isSelect ? "block" : "none";
+  }
+
+  function toggleFieldRowOptions(selectEl) {
+    const row = selectEl.closest(".form-field-item");
+    const wrap = row?.querySelector("[data-edit-field-options-wrap]");
+    if (wrap) wrap.style.display = selectEl.value === "select" ? "block" : "none";
+  }
+
   function renderFormFieldManager() {
     const list = document.getElementById("form-field-list");
     if (!list) return;
@@ -1381,25 +1423,31 @@
       list.innerHTML = '<div class="form-field-empty">Chưa có trường form nào. Thêm trường mới phía trên.</div>';
       return;
     }
-    const typeOptions = ["text", "tel", "email", "number", "date", "textarea"];
+    const typeOptions = ["text", "tel", "email", "number", "date", "textarea", "select"];
     list.innerHTML = formFields.map((field) => `
       <div class="form-field-item" data-manager-field="${escapeHtml(field.key)}">
-        <div class="form-field-edit-grid">
-          <div>
-            <label class="form-label">Tên trường</label>
-            <input class="form-input" data-edit-field="label" value="${escapeHtml(field.label)}">
+        <div class="form-field-main">
+          <div class="form-field-edit-grid">
+            <div>
+              <label class="form-label">Tên trường</label>
+              <input class="form-input" data-edit-field="label" value="${escapeHtml(field.label)}">
+            </div>
+            <div>
+              <label class="form-label">Kiểu</label>
+              <select class="form-select" data-edit-field="type" onchange="toggleFieldRowOptions(this)">
+                ${typeOptions.map((type) => `<option value="${type}" ${field.type === type ? "selected" : ""}>${type}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Placeholder</label>
+              <input class="form-input" data-edit-field="placeholder" value="${escapeHtml(field.placeholder || "")}">
+            </div>
+            <label class="form-field-check"><input type="checkbox" data-edit-field="required" ${field.required ? "checked" : ""}> Bắt buộc</label>
           </div>
-          <div>
-            <label class="form-label">Kiểu</label>
-            <select class="form-select" data-edit-field="type">
-              ${typeOptions.map((type) => `<option value="${type}" ${field.type === type ? "selected" : ""}>${type}</option>`).join("")}
-            </select>
+          <div data-edit-field-options-wrap style="display:${field.type === "select" ? "block" : "none"};margin-top:10px">
+            <label class="form-label">Danh sách lựa chọn (mỗi dòng 1 giá trị)</label>
+            <textarea class="form-input" data-edit-field="options" rows="4">${escapeHtml(optionsToLines(field.options))}</textarea>
           </div>
-          <div>
-            <label class="form-label">Placeholder</label>
-            <input class="form-input" data-edit-field="placeholder" value="${escapeHtml(field.placeholder || "")}">
-          </div>
-          <label class="form-field-check"><input type="checkbox" data-edit-field="required" ${field.required ? "checked" : ""}> Bắt buộc</label>
         </div>
         <div class="form-field-actions">
           <button type="button" class="save-field" onclick="updateFormField('${escapeHtml(field.key)}')">Lưu</button>
@@ -1413,9 +1461,14 @@
     const typeEl = document.getElementById("new-field-type");
     const placeholderEl = document.getElementById("new-field-placeholder");
     const requiredEl = document.getElementById("new-field-required");
+    const optionsEl = document.getElementById("new-field-options");
     const label = labelEl.value.trim();
     if (!label) {
       alert("Nhập tên trường trước.");
+      return;
+    }
+    if (typeEl.value === "select" && !linesToOptions(optionsEl.value).length) {
+      alert("Nhập ít nhất 1 lựa chọn cho trường kiểu select.");
       return;
     }
     try {
@@ -1427,12 +1480,16 @@
           type: typeEl.value,
           placeholder: placeholderEl.value.trim(),
           required: requiredEl.checked,
+          options: linesToOptions(optionsEl.value),
         }),
       });
       formFields = Array.isArray(data.fields) ? data.fields : formFields;
       labelEl.value = "";
       placeholderEl.value = "";
       requiredEl.checked = false;
+      optionsEl.value = "";
+      typeEl.value = "text";
+      toggleNewFieldOptions();
       renderFormFieldManager();
       bindLandingRuntime(getEditableArea());
       setEditStatus("Đã thêm trường form và cột DB tương ứng.");
@@ -1449,15 +1506,20 @@
     const type = row.querySelector('[data-edit-field="type"]')?.value || "text";
     const placeholder = row.querySelector('[data-edit-field="placeholder"]')?.value.trim() || "";
     const required = !!row.querySelector('[data-edit-field="required"]')?.checked;
+    const options = linesToOptions(row.querySelector('[data-edit-field="options"]')?.value || "");
     if (!label) {
       alert("Tên trường không được trống.");
+      return;
+    }
+    if (type === "select" && !options.length) {
+      alert("Nhập ít nhất 1 lựa chọn cho trường kiểu select.");
       return;
     }
     try {
       const data = await requestJson("/" + encodeURIComponent(key), {
         apiBase: "api/form-fields",
         method: "PATCH",
-        body: JSON.stringify({ label, type, placeholder, required }),
+        body: JSON.stringify({ label, type, placeholder, required, options }),
       });
       formFields = Array.isArray(data.fields) ? data.fields : formFields;
       renderFormFieldManager();

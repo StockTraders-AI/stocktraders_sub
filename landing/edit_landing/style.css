@@ -647,12 +647,18 @@ footer{
   resize: vertical;
   min-height: 92px;
 }
+.form-field-main {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
 .form-field-edit-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(105px, .55fr) minmax(0, 1fr) 108px;
   gap: 10px;
   align-items: end;
-  flex: 1 1 auto;
   min-width: 0;
 }
 .form-field-edit-grid > div {
