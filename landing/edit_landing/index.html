@@ -486,15 +486,15 @@
     <div class="form-box">
       <div class="form-row">
         <label class="form-label">Họ và tên *</label>
-        <input class="form-input" id="lead-name" type="text" placeholder="Nguyễn Văn A">
+        <input class="form-input" id="lead-name" type="text" placeholder="Nguyễn Văn A" autocomplete="off">
       </div>
       <div class="form-row">
         <label class="form-label">Số điện thoại *</label>
-        <input class="form-input" id="lead-phone" type="tel" placeholder="0901 234 567">
+        <input class="form-input" id="lead-phone" type="tel" placeholder="0901 234 567" autocomplete="off">
       </div>
       <div class="form-row">
         <label class="form-label">Email</label>
-        <input class="form-input" id="lead-email" type="email" placeholder="email@example.com">
+        <input class="form-input" id="lead-email" type="email" placeholder="email@example.com" autocomplete="off">
       </div>
       <div id="form-error" style="display:none;color:var(--R);font-size:12.5px;margin-bottom:10px"></div>
       <button class="form-submit" id="form-submit-btn" onclick="handleSubmit(event)">
@@ -1204,15 +1204,15 @@
     const placeholder = escapeHtml(field.placeholder || "");
     const type = ["text", "tel", "email", "number", "date"].includes(field.type) ? field.type : "text";
     if (field.type === "textarea") {
-      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><textarea class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" placeholder="${placeholder}" rows="3"></textarea></div>`;
+      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><textarea class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" placeholder="${placeholder}" rows="3" autocomplete="off"></textarea></div>`;
     }
     if (field.type === "select") {
       const options = Array.isArray(field.options) ? field.options : [];
       const placeholderLabel = escapeHtml(field.placeholder || `Chọn ${field.label}`);
       const optionsHtml = options.map((opt) => `<option value="${escapeHtml(opt)}">${escapeHtml(opt)}</option>`).join("");
-      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><select class="form-select" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}"><option value="" selected disabled>${placeholderLabel}</option>${optionsHtml}</select></div>`;
+      return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><select class="form-select" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" autocomplete="off"><option value="" selected disabled>${placeholderLabel}</option>${optionsHtml}</select></div>`;
     }
-    return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><input class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" type="${type}" placeholder="${placeholder}"></div>`;
+    return `<div class="form-row dynamic-form-row" data-form-row="${key}"><label class="form-label">${label}</label><input class="form-input" id="${fieldInputId(field.key)}" name="${key}" data-field-key="${key}" type="${type}" placeholder="${placeholder}" autocomplete="off"></div>`;
   }
 
 
