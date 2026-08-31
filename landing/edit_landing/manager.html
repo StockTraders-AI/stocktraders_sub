@@ -483,10 +483,138 @@
       return `<section class="custom-pasted-section ${scopeClass}">${scopedStyle}<div class="pasted-document">${bodyHtml}</div></section>`;
     }
 
+    function cssEscape(value) {
+      return String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    }
+
+    function normalizeVietnameseKey(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 40) || "field";
+    }
+
+    function textForFieldGuess(value) {
+      return String(value || "")
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .replace(/đ/g, "d")
+        .replace(/Đ/g, "D")
+        .toLowerCase();
+    }
+
+    function inferCanonicalKey(label, el) {
+      const haystack = textForFieldGuess([label, el?.name, el?.id, el?.placeholder, el?.type].join(" "));
+      if (/email|e_mail|mail/.test(haystack)) return "email";
+      if (/phone|tel|sdt|so_dien_thoai|dien thoai/.test(haystack)) return "phone";
+      if (/full.?name|name|ho va ten|ho ten|ten khach/.test(haystack)) return "name";
+      if (/capital|investment|amount|budget|von dau tu|so von|von/.test(haystack)) return "capital";
+      return normalizeVietnameseKey(label || el?.name || el?.id || el?.placeholder);
+    }
+
+    function cleanFieldLabel(value) {
+      return String(value || "")
+        .replace(/[*:：]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function labelForInput(el, root = document) {
+      if (!el) return "";
+      if (el.id) {
+        const direct = root.querySelector?.(`label[for="${cssEscape(el.id)}"]`);
+        if (direct?.textContent) return cleanFieldLabel(direct.textContent);
+      }
+      const wrapperLabel = el.closest("label");
+      if (wrapperLabel?.textContent) {
+        return cleanFieldLabel(wrapperLabel.textContent.replace(el.value || "", ""));
+      }
+      const row = el.closest(".form-row, [data-form-row], .field, .input-group, div, p");
+      const rowLabel = row?.querySelector?.("label, .form-label, .label, [class*='label' i]");
+      if (rowLabel?.textContent) return cleanFieldLabel(rowLabel.textContent);
+      let prev = el.previousElementSibling;
+      while (prev) {
+        if (/^(label|span|div|p)$/i.test(prev.tagName) && cleanFieldLabel(prev.textContent)) {
+          return cleanFieldLabel(prev.textContent);
+        }
+        prev = prev.previousElementSibling;
+      }
+      return cleanFieldLabel(el.getAttribute("aria-label") || el.placeholder || el.name || el.id);
+    }
+
+    function inferInputType(el) {
+      if (!el) return "text";
+      const tag = el.tagName?.toLowerCase();
+      if (tag === "textarea") return "textarea";
+      if (tag === "select") return "select";
+      const type = (el.type || "text").toLowerCase();
+      if (["tel", "email", "number", "date"].includes(type)) return type;
+      return "text";
+    }
+
+    function extractSelectOptions(el) {
+      if (el?.tagName?.toLowerCase() !== "select") return [];
+      return Array.from(el.options || [])
+        .filter((opt) => opt.value)
+        .map((opt) => (opt.textContent || opt.value || "").trim())
+        .filter(Boolean);
+    }
+
+    function getLeadFormContainer(root = document) {
+      const scope = root || document;
+      const submitSelector = "#form-submit-btn, button[type='submit'], input[type='submit'], .form-submit, .signup-btn";
+      const buttons = Array.from(scope.querySelectorAll?.(submitSelector) || []);
+      for (const button of buttons) {
+        const container = button.closest("form, .form-box, .signup-box, .form-section, section, div");
+        if (container?.querySelector?.("input:not([type='hidden']), textarea, select")) return container;
+      }
+      const form = scope.querySelector?.("form");
+      if (form) return form;
+      const firstInput = scope.querySelector?.("input:not([type='hidden']), textarea, select");
+      return firstInput?.closest("form, .form-box, .signup-box, .form-section, section, div") || scope;
+    }
+
+    function detectFormFieldsFromRoot(root = document) {
+      const container = getLeadFormContainer(root);
+      if (!container?.querySelectorAll) return [];
+      const controls = Array.from(container.querySelectorAll("input, textarea, select"))
+        .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((el.type || "").toLowerCase()));
+      const seen = new Set();
+      return controls.map((el, index) => {
+        const label = labelForInput(el, container);
+        const key = inferCanonicalKey(label, el);
+        const type = inferInputType(el);
+        const field = {
+          key,
+          label: label || `Trường ${index + 1}`,
+          type,
+          placeholder: el.placeholder || "",
+          required: !!el.required || /\*/.test(labelForInput(el, container)),
+          position: (index + 1) * 10,
+          options: type === "select" ? extractSelectOptions(el) : undefined,
+        };
+        return field;
+      }).filter((field) => {
+        if (!field.label || seen.has(field.key)) return false;
+        if (field.type === "select" && !field.options.length) return false;
+        seen.add(field.key);
+        return true;
+      });
+    }
+
     async function createLanding() {
       let html = $("html").value;
+      let detectedFields = [];
       if (sourceInput.value === "html" && html.trim()) {
         html = extractHtmlForEditableArea(html, "replace");
+        const scratch = document.createElement("div");
+        scratch.innerHTML = html;
+        detectedFields = detectFormFieldsFromRoot(scratch);
       }
       const payload = {
         pin: $("pin").value.trim(),
@@ -505,6 +633,12 @@
           method: "POST",
           body: JSON.stringify(payload),
         });
+        if (detectedFields.length) {
+          await requestJson(`/${encodeURIComponent(data.landing.slug)}/api/form-fields`, {
+            method: "PUT",
+            body: JSON.stringify({ fields: detectedFields }),
+          });
+        }
         await loadLandings();
         setMessage(`Đã tạo /${data.landing.slug}/. Mở landing đó để sửa HTML/form như bình thường.`);
       } catch (err) {
