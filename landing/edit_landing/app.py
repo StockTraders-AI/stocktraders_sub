@@ -652,17 +652,6 @@ def style(slug):
     return send_from_directory(BASE_DIR, "style.css")
 
 
-@app.get("/landing-html-transform.js")
-def root_landing_html_transform():
-    return send_from_directory(BASE_DIR, "landing-html-transform.js")
-
-
-@app.get("/<slug>/landing-html-transform.js")
-def landing_html_transform(slug):
-    require_landing(slug)
-    return send_from_directory(BASE_DIR, "landing-html-transform.js")
-
-
 @app.get("/favicon.jpg")
 @app.get("/<slug>/favicon.jpg")
 def favicon(slug=None):
