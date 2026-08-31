@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Landing Manager - StockTraders AI</title>
-  <script src="/landing-html-transform.js"></script>
   <style>
     :root { color-scheme: dark; --bg:#090d15; --panel:#111827; --line:#273247; --text:#eef2ff; --muted:#8190ad; --green:#38d68c; --purple:#8b5cf6; --red:#ff4778; }
     * { box-sizing: border-box; }
@@ -265,17 +264,13 @@
     }
 
     async function createLanding() {
-      let html = $("html").value;
-      if (sourceInput.value === "html" && html.trim() && window.LandingHtmlTransform) {
-        html = window.LandingHtmlTransform.extractHtmlForEditableArea(html, "replace");
-      }
       const payload = {
         pin: $("pin").value.trim(),
         title: titleInput.value.trim(),
         slug: slugInput.value.trim(),
         source: sourceInput.value,
         copy_from: $("copy-from").value,
-        html,
+        html: $("html").value,
       };
       if (!payload.pin || !payload.slug) {
         setMessage("Nhập PIN và slug trước.", true);
