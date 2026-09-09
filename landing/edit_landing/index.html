@@ -1375,12 +1375,50 @@
     scope.querySelectorAll?.(".reveal").forEach((el) => el.classList.add("vis"));
   }
 
+  // Pasted landing HTML has its own <script> stripped for security, so a common
+  // "click a button, show the matching panel" pattern (tab-style package/plan
+  // pickers) silently stops working. Re-implement that interaction here, in
+  // trusted platform code, driven purely by data-*/class conventions already
+  // present in the markup — no script execution from pasted content involved.
+  function bindPackageTabs(root = document) {
+    const scope = root || document;
+    scope.querySelectorAll?.(".tabs").forEach((tabGroup) => {
+      if (tabGroup.dataset.tabsBound) return;
+      const buttons = Array.from(tabGroup.querySelectorAll("[data-pkg], [data-tab]"));
+      if (!buttons.length) return;
+      tabGroup.dataset.tabsBound = "1";
+      const panelScope = tabGroup.parentElement || scope;
+      const keyOf = (el) => el.dataset.pkg ?? el.dataset.tab;
+
+      const activate = (key) => {
+        buttons.forEach((b) => b.classList.toggle("active", keyOf(b) === key));
+        panelScope.querySelectorAll("[data-panel]").forEach((p) => {
+          p.classList.toggle("active", p.dataset.panel === key);
+        });
+        panelScope.querySelectorAll('input[type="radio"]').forEach((r) => {
+          if (!buttons.some((b) => keyOf(b) === r.value)) return;
+          const shouldCheck = r.value === key;
+          if (r.checked !== shouldCheck) r.checked = shouldCheck;
+          r.closest("label")?.classList.toggle("checked", shouldCheck);
+        });
+      };
+
+      buttons.forEach((btn) => btn.addEventListener("click", () => activate(keyOf(btn))));
+      panelScope.querySelectorAll('input[type="radio"]').forEach((r) => {
+        r.addEventListener("change", () => {
+          if (buttons.some((b) => keyOf(b) === r.value)) activate(r.value);
+        });
+      });
+    });
+  }
+
   function bindLandingRuntime(root = document) {
     if (root === getEditableArea()) removePublicAdminPanels(root);
     materializeTemplateLogos(root);
     ensureImportedHeroIsolation(root);
     activateRevealBlocks(root);
     bindLandingCtas(root);
+    bindPackageTabs(root);
     if (hasLeadFormMarkup(root)) normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
