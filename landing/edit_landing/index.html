@@ -1380,35 +1380,69 @@
   // pickers) silently stops working. Re-implement that interaction here, in
   // trusted platform code, driven purely by data-*/class conventions already
   // present in the markup — no script execution from pasted content involved.
+  // Radios living elsewhere on the page (e.g. a "which package do you want"
+  // field further down a signup form) are matched by shared value too, the
+  // same way the original hand-written scripts for these templates did it.
   function bindPackageTabs(root = document) {
     const scope = root || document;
-    scope.querySelectorAll?.(".tabs").forEach((tabGroup) => {
-      if (tabGroup.dataset.tabsBound) return;
-      const buttons = Array.from(tabGroup.querySelectorAll("[data-pkg], [data-tab]"));
-      if (!buttons.length) return;
-      tabGroup.dataset.tabsBound = "1";
-      const panelScope = tabGroup.parentElement || scope;
-      const keyOf = (el) => el.dataset.pkg ?? el.dataset.tab;
+    const buttonGroups = Array.from(scope.querySelectorAll?.(".tabs") || [])
+      .map((tabGroup) => ({ tabGroup, buttons: Array.from(tabGroup.querySelectorAll("[data-pkg], [data-tab]")) }))
+      .filter(({ tabGroup, buttons }) => buttons.length && !tabGroup.dataset.tabsBound);
+    if (!buttonGroups.length) return;
+    const keyOf = (el) => el.dataset.pkg ?? el.dataset.tab;
 
-      const activate = (key) => {
+    const activate = (key) => {
+      buttonGroups.forEach(({ buttons }) => {
         buttons.forEach((b) => b.classList.toggle("active", keyOf(b) === key));
-        panelScope.querySelectorAll("[data-panel]").forEach((p) => {
-          p.classList.toggle("active", p.dataset.panel === key);
-        });
-        panelScope.querySelectorAll('input[type="radio"]').forEach((r) => {
-          if (!buttons.some((b) => keyOf(b) === r.value)) return;
-          const shouldCheck = r.value === key;
-          if (r.checked !== shouldCheck) r.checked = shouldCheck;
-          r.closest("label")?.classList.toggle("checked", shouldCheck);
-        });
-      };
-
-      buttons.forEach((btn) => btn.addEventListener("click", () => activate(keyOf(btn))));
-      panelScope.querySelectorAll('input[type="radio"]').forEach((r) => {
-        r.addEventListener("change", () => {
-          if (buttons.some((b) => keyOf(b) === r.value)) activate(r.value);
-        });
       });
+      scope.querySelectorAll("[data-panel]").forEach((p) => {
+        p.classList.toggle("active", p.dataset.panel === key);
+      });
+      scope.querySelectorAll('input[type="radio"]').forEach((r) => {
+        if (!buttonGroups.some(({ buttons }) => buttons.some((b) => keyOf(b) === r.value))) return;
+        const shouldCheck = r.value === key;
+        if (r.checked !== shouldCheck) r.checked = shouldCheck;
+        r.closest("label")?.classList.toggle("checked", shouldCheck);
+      });
+    };
+
+    buttonGroups.forEach(({ tabGroup, buttons }) => {
+      tabGroup.dataset.tabsBound = "1";
+      buttons.forEach((btn) => btn.addEventListener("click", () => activate(keyOf(btn))));
+    });
+    scope.querySelectorAll('input[type="radio"]').forEach((r) => {
+      if (r.dataset.pkgTabBound) return;
+      r.dataset.pkgTabBound = "1";
+      r.addEventListener("change", () => {
+        if (buttonGroups.some(({ buttons }) => buttons.some((b) => keyOf(b) === r.value))) activate(r.value);
+      });
+    });
+  }
+
+  // Companion to bindPackageTabs: any <label> wrapping a radio input commonly
+  // relies on a script-toggled "checked" class for its selected-state styling
+  // (radio :checked alone isn't enough since the class lives on the label,
+  // not the input). Keep that class in sync generically, by radio name group,
+  // so option pickers built this way still show which one is selected even
+  // without their original inline script.
+  function bindRadioLabelSync(root = document) {
+    const scope = root || document;
+    const groups = new Map();
+    scope.querySelectorAll('input[type="radio"][name]').forEach((r) => {
+      if (!r.closest("label")) return;
+      if (!groups.has(r.name)) groups.set(r.name, []);
+      groups.get(r.name).push(r);
+    });
+    groups.forEach((radios) => {
+      const sync = () => {
+        radios.forEach((r) => r.closest("label")?.classList.toggle("checked", r.checked));
+      };
+      radios.forEach((r) => {
+        if (r.dataset.labelSyncBound) return;
+        r.dataset.labelSyncBound = "1";
+        r.addEventListener("change", sync);
+      });
+      sync();
     });
   }
 
@@ -1419,6 +1453,7 @@
     activateRevealBlocks(root);
     bindLandingCtas(root);
     bindPackageTabs(root);
+    bindRadioLabelSync(root);
     if (hasLeadFormMarkup(root)) normalizeLeadForm(root);
     ensureFooterTrigger(root);
   }
