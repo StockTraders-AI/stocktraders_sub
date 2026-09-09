@@ -1191,10 +1191,20 @@
   }
 
   function findExistingFieldElement(field, container, used = new Set()) {
+    const expectedTag = expectedTagForFieldType(field.type);
     const el = container.querySelector?.(fieldSelector(field));
-    if (!el || used.has(el)) return null;
-    if (el.tagName.toLowerCase() !== expectedTagForFieldType(field.type)) return null;
-    return el;
+    if (el && !used.has(el) && el.tagName.toLowerCase() === expectedTag) return el;
+    // Fallback for freshly pasted HTML: its inputs won't yet carry the "lead-<key>"
+    // id/name convention, so re-derive each candidate's key the same way it was
+    // detected and match on that instead of losing/repositioning the element.
+    const candidates = container.querySelectorAll?.("input, textarea, select") || [];
+    for (const candidate of candidates) {
+      if (used.has(candidate) || candidate.tagName.toLowerCase() !== expectedTag) continue;
+      const type = (candidate.type || "").toLowerCase();
+      if (["hidden", "submit", "button", "checkbox", "radio", "file"].includes(type)) continue;
+      if (inferCanonicalKey(labelForInput(candidate, container), candidate) === field.key) return candidate;
+    }
+    return null;
   }
 
   function fieldRowHtml(field) {
