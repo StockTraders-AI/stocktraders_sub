@@ -1124,13 +1124,44 @@
       .filter(Boolean);
   }
 
+  // Label for a whole radio group (e.g. "Gói muốn đăng ký"), as opposed to
+  // labelForInput which reads a single radio's own wrapping <label> (its
+  // per-option text like "3 tháng"). Looks for a label that's a direct child
+  // of the group's row/field container and doesn't belong to one of the
+  // radios themselves.
+  function groupLabelForRadios(radios, container) {
+    const first = radios[0];
+    if (!first) return "";
+    const row = first.closest(".form-row, [data-form-row], .field, .input-group");
+    if (row) {
+      const candidate = Array.from(row.children).find((child) => child.tagName === "LABEL" && !child.contains(first));
+      if (candidate?.textContent) return cleanFieldLabel(candidate.textContent);
+    }
+    return cleanFieldLabel(first.name);
+  }
+
   function detectFormFieldsFromRoot(root = document) {
     const container = getLeadFormContainer(root);
     if (!container?.querySelectorAll) return [];
     const controls = Array.from(container.querySelectorAll("input, textarea, select"))
-      .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((el.type || "").toLowerCase()));
+      .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "file"].includes((el.type || "").toLowerCase()));
     const seen = new Set();
+    const seenRadioNames = new Set();
     return controls.map((el, index) => {
+      if ((el.type || "").toLowerCase() === "radio") {
+        if (!el.name || seenRadioNames.has(el.name)) return null;
+        seenRadioNames.add(el.name);
+        const radios = Array.from(container.querySelectorAll(`input[type="radio"][name="${cssEscape(el.name)}"]`));
+        return {
+          key: el.name,
+          label: groupLabelForRadios(radios, container) || el.name,
+          type: "radio",
+          placeholder: "",
+          required: radios.some((r) => r.required),
+          position: (index + 1) * 10,
+          options: radios.map((r) => cleanFieldLabel(labelForInput(r, container)) || r.value),
+        };
+      }
       const label = labelForInput(el, container);
       const key = inferCanonicalKey(label, el);
       const type = inferInputType(el);
@@ -1145,7 +1176,7 @@
       };
       return field;
     }).filter((field) => {
-      if (!field.label || seen.has(field.key)) return false;
+      if (!field || !field.label || seen.has(field.key)) return false;
       if (field.type === "select" && !field.options.length) return false;
       seen.add(field.key);
       return true;
@@ -1248,6 +1279,13 @@
     const used = new Set();
 
     formFields.forEach((field) => {
+      if (field.type === "radio") {
+        // A radio group's inputs must all keep the same shared `name` to stay
+        // a working group, so it can't be renamed/moved the way a single
+        // input can — just mark its members present instead of reconciling.
+        container.querySelectorAll(`input[type="radio"][name="${cssEscape(field.key)}"]`).forEach((r) => used.add(r));
+        return;
+      }
       let el = findExistingFieldElement(field, container, used);
       if (!el) {
         const stale = container.querySelector(fieldSelector(field));
@@ -1499,7 +1537,7 @@
       list.innerHTML = '<div class="form-field-empty">Chưa có trường form nào. Thêm trường mới phía trên.</div>';
       return;
     }
-    const typeOptions = ["text", "tel", "email", "number", "date", "textarea", "select"];
+    const typeOptions = ["text", "tel", "email", "number", "date", "textarea", "select", "radio"];
     list.innerHTML = formFields.map((field) => `
       <div class="form-field-item" data-manager-field="${escapeHtml(field.key)}">
         <div class="form-field-main">
@@ -1718,6 +1756,12 @@
     const payload = {};
 
     formFields.forEach((field) => {
+      if (field.type === "radio") {
+        const checkedRadio = context.querySelector(`input[type="radio"][name="${cssEscape(field.key)}"]:checked`)
+          || document.querySelector(`input[type="radio"][name="${cssEscape(field.key)}"]:checked`);
+        payload[field.key] = checkedRadio?.value || "";
+        return;
+      }
       const el = context.querySelector(fieldSelector(field)) || document.querySelector(fieldSelector(field));
       payload[field.key] = (el?.value || "").trim();
     });

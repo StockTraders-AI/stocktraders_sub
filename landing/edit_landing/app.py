@@ -438,7 +438,7 @@ def stable_field_key(conn, label, requested_key=None, current_key=None):
     return key
 
 
-FIELD_TYPES = {"text", "tel", "email", "number", "date", "textarea", "select"}
+FIELD_TYPES = {"text", "tel", "email", "number", "date", "textarea", "select", "radio"}
 
 
 def normalize_field_payload(field, fallback_position):
@@ -448,7 +448,7 @@ def normalize_field_payload(field, fallback_position):
     input_type = clean(field.get("type")) or "text"
     if input_type not in FIELD_TYPES:
         input_type = "text"
-    options = options_to_text(field.get("options")) if input_type == "select" else ""
+    options = options_to_text(field.get("options")) if input_type in ("select", "radio") else ""
     return {
         "key": normalize_key(field.get("key") or label),
         "label": label,
@@ -782,7 +782,7 @@ def add_form_field(slug):
         input_type = "text"
     placeholder = clean(data.get("placeholder"))
     required = bool(data.get("required"))
-    options = options_to_text(data.get("options")) if input_type == "select" else ""
+    options = options_to_text(data.get("options")) if input_type in ("select", "radio") else ""
     now = datetime.now(timezone.utc).isoformat()
     with get_db(slug) as conn:
         key = unique_field_key(conn, label)
@@ -813,7 +813,7 @@ def update_form_field(slug, field_key):
         input_type = "text"
     placeholder = clean(data.get("placeholder"))
     required = bool(data.get("required"))
-    options = options_to_text(data.get("options")) if input_type == "select" else ""
+    options = options_to_text(data.get("options")) if input_type in ("select", "radio") else ""
 
     with get_db(slug) as conn:
         row = conn.execute("SELECT key FROM form_fields WHERE key = ?", (key,)).fetchone()

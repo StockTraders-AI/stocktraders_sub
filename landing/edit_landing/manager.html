@@ -579,13 +579,39 @@
       return firstInput?.closest("form, .form-box, .signup-box, .form-section, section, div") || scope;
     }
 
+    function groupLabelForRadios(radios, container) {
+      const first = radios[0];
+      if (!first) return "";
+      const row = first.closest(".form-row, [data-form-row], .field, .input-group");
+      if (row) {
+        const candidate = Array.from(row.children).find((child) => child.tagName === "LABEL" && !child.contains(first));
+        if (candidate?.textContent) return cleanFieldLabel(candidate.textContent);
+      }
+      return cleanFieldLabel(first.name);
+    }
+
     function detectFormFieldsFromRoot(root = document) {
       const container = getLeadFormContainer(root);
       if (!container?.querySelectorAll) return [];
       const controls = Array.from(container.querySelectorAll("input, textarea, select"))
-        .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "radio", "file"].includes((el.type || "").toLowerCase()));
+        .filter((el) => !el.disabled && !["hidden", "submit", "button", "checkbox", "file"].includes((el.type || "").toLowerCase()));
       const seen = new Set();
+      const seenRadioNames = new Set();
       return controls.map((el, index) => {
+        if ((el.type || "").toLowerCase() === "radio") {
+          if (!el.name || seenRadioNames.has(el.name)) return null;
+          seenRadioNames.add(el.name);
+          const radios = Array.from(container.querySelectorAll(`input[type="radio"][name="${cssEscape(el.name)}"]`));
+          return {
+            key: el.name,
+            label: groupLabelForRadios(radios, container) || el.name,
+            type: "radio",
+            placeholder: "",
+            required: radios.some((r) => r.required),
+            position: (index + 1) * 10,
+            options: radios.map((r) => cleanFieldLabel(labelForInput(r, container)) || r.value),
+          };
+        }
         const label = labelForInput(el, container);
         const key = inferCanonicalKey(label, el);
         const type = inferInputType(el);
@@ -600,7 +626,7 @@
         };
         return field;
       }).filter((field) => {
-        if (!field.label || seen.has(field.key)) return false;
+        if (!field || !field.label || seen.has(field.key)) return false;
         if (field.type === "select" && !field.options.length) return false;
         seen.add(field.key);
         return true;
