@@ -1,0 +1,12 @@
+[Unit]
+Description=stocktraders-landing daily DB backup service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /root/stocktraders-landing/scripts/backup_db.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
