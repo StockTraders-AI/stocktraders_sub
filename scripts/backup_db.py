@@ -24,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent / "landing" / "edit_landin
 BACKUP_DIR = Path("/root/db-backups/stocktraders-landing-edit_landing")
 RETENTION_DAYS = 365
 
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
