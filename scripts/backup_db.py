@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Backup service for stocktraders-landing SQLite databases.
+"""Backup service for the edit_landing page-manager SQLite databases.
 
-Multiple landing microsites each keep their own SQLite file (leads,
-info, etc.) scattered across subfolders. This walks the project for
+edit_landing (landing/edit_landing) is the Flask page manager used to
+edit content for several landing pages, each with its own SQLite file
+under data/ plus a shared leads.db. This walks that subfolder only for
 every *.db file and backs each one up under a name derived from its
-relative path, so files with the same basename (e.g. two "leads.db")
-don't collide.
+relative path, so files with the same basename don't collide.
 
 Runs as a long-lived process (systemd/pm2), not via cron. On startup it
 takes a backup immediately, then schedules one every day at 00:00. Old
@@ -20,8 +20,8 @@ from pathlib import Path
 
 from apscheduler.schedulers.blocking import BlockingScheduler
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-BACKUP_DIR = Path("/root/db-backups/stocktraders-landing")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent / "landing" / "edit_landing"
+BACKUP_DIR = Path("/root/db-backups/stocktraders-landing-edit_landing")
 RETENTION_DAYS = 365
 
 logging.basicConfig(
@@ -32,7 +32,7 @@ logging.basicConfig(
         logging.StreamHandler(),
     ],
 )
-log = logging.getLogger("backup_stocktraders_landing")
+log = logging.getLogger("backup_edit_landing")
 
 
 def find_db_files() -> list[Path]:
