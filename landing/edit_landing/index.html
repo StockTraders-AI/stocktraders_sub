@@ -1393,19 +1393,24 @@
     const area = getEditableArea();
     const footer = (root || document).querySelector?.("footer") || area?.querySelector("footer");
     if (!footer) {
-      area?.insertAdjacentHTML("beforeend", '<footer><div onclick="toggleAdmin()" style="cursor:default;user-select:none">© 2026 StockTraders</div></footer>');
+      area?.insertAdjacentHTML("beforeend", '<footer><div data-admin-trigger="1" onclick="toggleAdmin()" style="cursor:default;user-select:none">© 2026 StockTraders</div></footer>');
       return;
     }
-    if (!footer.textContent.includes("StockTraders")) {
-      footer.insertAdjacentHTML("beforeend", '<div onclick="toggleAdmin()" style="cursor:default;user-select:none">© 2026 StockTraders</div>');
+    // Đã có sẵn điểm bấm (do lần chạy trước gắn) hoặc chính html mẫu dán vào
+    // đã có sẵn một dòng bản quyền (© + năm) -> tái dùng, không tạo thêm dòng mới.
+    const existingTrigger = footer.querySelector("[data-admin-trigger]");
+    const existingCopyright = Array.from(footer.querySelectorAll("div, span, p, small")).find(
+      (el) => !el.hasAttribute("data-admin-trigger") && /©\s*20\d\d/.test(el.textContent || "")
+    );
+    const trigger = existingTrigger || existingCopyright;
+    if (!trigger) {
+      footer.insertAdjacentHTML("beforeend", '<div data-admin-trigger="1" onclick="toggleAdmin()" style="cursor:default;user-select:none">© 2026 StockTraders</div>');
+    } else {
+      trigger.setAttribute("data-admin-trigger", "1");
+      trigger.onclick = toggleAdmin;
+      trigger.style.cursor = "default";
+      trigger.style.userSelect = "none";
     }
-    footer.querySelectorAll("div, span, p, small").forEach((el) => {
-      if (/2026|StockTraders/i.test(el.textContent || "")) {
-        el.onclick = toggleAdmin;
-        el.style.cursor = "default";
-        el.style.userSelect = "none";
-      }
-    });
   }
 
   function activateRevealBlocks(root = document) {
