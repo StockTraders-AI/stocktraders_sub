@@ -566,6 +566,10 @@
 
 
 <script>
+// Landing HTML is allowed to ship its own scripts, which run before this one.
+// Keep the platform code in its own scope so a landing's globals (e.g. its own
+// `formFields`, `handleSubmit`, `escapeHtml`) can neither crash nor override it.
+(() => {
   window.__EDIT_LANDING_PRELOADED__ = false;
   const ADMIN_PIN = "9983";
   let leadsCache = [];
@@ -669,7 +673,6 @@
     const clone = area.cloneNode(true);
     removeEditControls(clone);
     removePublicAdminPanels(clone);
-    removeInlineHandlers(clone);
     clone.classList.remove("edit-mode");
     clone.removeAttribute("id");
     return clone.innerHTML.trim();
@@ -840,19 +843,6 @@
     });
   }
 
-  function removeInlineHandlers(root) {
-    if (!root?.querySelectorAll) return;
-    root.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes || []).forEach((attr) => {
-        const name = attr.name.toLowerCase();
-        const value = String(attr.value || "").trim().toLowerCase();
-        if (name.startsWith("on")) el.removeAttribute(attr.name);
-        if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
-          el.setAttribute(attr.name, "#");
-        }
-      });
-    });
-  }
   function extractDefaultLogoSrc(rawHtml) {
     const match = String(rawHtml || "").match(/const\s+DEFAULT_LOGO\s*=\s*(['"])(data:image\/[^'"]+)\1/);
     return match?.[2] || "";
@@ -968,11 +958,16 @@
       });
     }
 
+    // Only the <body> is kept for a full document, so carry over the scripts and
+    // stylesheets it loaded in <head> (e.g. a slider library and its CSS).
+    const headAssets = hasDocumentShell
+      ? Array.from(doc.head?.querySelectorAll('script, link[rel~="stylesheet" i]') || []).map((el) => el.outerHTML).join("")
+      : "";
+
     materializeTemplateLogos(container, rawHtml);
-    container.querySelectorAll("script, meta, title, base").forEach((el) => el.remove());
+    container.querySelectorAll("meta, title, base").forEach((el) => el.remove());
     removePublicAdminPanels(container);
-    removeInlineHandlers(container);
-    const bodyHtml = container.innerHTML.trim();
+    const bodyHtml = (headAssets + container.innerHTML).trim();
 
     if (mode === "replace") {
       const scopeSelector = "#editable-area";
@@ -1418,11 +1413,11 @@
     scope.querySelectorAll?.(".reveal").forEach((el) => el.classList.add("vis"));
   }
 
-  // Pasted landing HTML has its own <script> stripped for security, so a common
-  // "click a button, show the matching panel" pattern (tab-style package/plan
-  // pickers: .tabs [data-pkg|data-tab] + [data-panel], plus a matching radio
-  // group elsewhere on the page) would stop working. Handle it here with
-  // document-level delegated listeners instead of per-element binding: nothing
+  // Landings saved while <script> tags were still being stripped have lost their
+  // own JS, so a common "click a button, show the matching panel" pattern
+  // (tab-style package/plan pickers: .tabs [data-pkg|data-tab] + [data-panel],
+  // plus a matching radio group elsewhere on the page) is handled here too. It
+  // uses document-level delegated listeners instead of per-element binding: nothing
   // is attached to or written onto the landing's own elements, so no "already
   // bound" state can be saved into the page HTML (which previously made buttons
   // go dead after a "Lưu UI"), and it keeps working after any content swap
@@ -1964,6 +1959,17 @@
       wrap.style.transform = `scale(${scale})`;
     }, 30);
   });
+
+  // Called from inline onclick/onchange attributes in the admin/edit UI.
+  Object.assign(window, {
+    openHtmlPaste, openFormFieldManager, saveEditableContent, resetEditableContent,
+    disableEditMode, applyPastedHtml, closeHtmlPaste, toggleNewFieldOptions,
+    addFormField, closeFormFieldModal, handleSubmit, toggleAdmin, adminLogin,
+    loadLeads, exportLeadsCSV, closeAdmin, moveEditableSection,
+    duplicateEditableSection, removeEditableSection, toggleFieldRowOptions,
+    updateFormField, deleteFormField, deleteLead,
+  });
+})();
 </script>
   </body>
 </html>

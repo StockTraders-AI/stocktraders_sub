@@ -368,20 +368,6 @@
       });
     }
 
-    function removeInlineHandlers(root) {
-      if (!root?.querySelectorAll) return;
-      root.querySelectorAll("*").forEach((el) => {
-        Array.from(el.attributes || []).forEach((attr) => {
-          const name = attr.name.toLowerCase();
-          const value = String(attr.value || "").trim().toLowerCase();
-          if (name.startsWith("on")) el.removeAttribute(attr.name);
-          if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
-            el.setAttribute(attr.name, "#");
-          }
-        });
-      });
-    }
-
     function extractDefaultLogoSrc(rawHtml) {
       const match = String(rawHtml || "").match(/const\s+DEFAULT_LOGO\s*=\s*(['"])(data:image\/[^'"]+)\1/);
       return match?.[2] || "";
@@ -460,11 +446,14 @@
         });
       }
 
+      const headAssets = hasDocumentShell
+        ? Array.from(doc.head?.querySelectorAll('script, link[rel~="stylesheet" i]') || []).map((el) => el.outerHTML).join("")
+        : "";
+
       materializeTemplateLogos(container, rawHtml);
-      container.querySelectorAll("script, meta, title, base").forEach((el) => el.remove());
+      container.querySelectorAll("meta, title, base").forEach((el) => el.remove());
       removePublicAdminPanels(container);
-      removeInlineHandlers(container);
-      const bodyHtml = container.innerHTML.trim();
+      const bodyHtml = (headAssets + container.innerHTML).trim();
 
       if (mode === "replace") {
         const scopeSelector = "#editable-area";

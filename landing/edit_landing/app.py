@@ -259,15 +259,10 @@ def set_setting(conn, key, value):
 def sanitize_landing_html(html):
     source = str(html or "")
     source = re.sub(r"(?is)<!doctype[^>]*>", "", source)
-    source = re.sub(r"(?is)<script\b[^>]*>.*?</script>", "", source)
     source = re.sub(r"(?is)<meta\b[^>]*>", "", source)
     source = re.sub(r"(?is)<base\b[^>]*>", "", source)
     source = re.sub(r"(?is)<title\b[^>]*>.*?</title>", "", source)
     source = re.sub(r"(?is)</?(?:html|head|body)\b[^>]*>", "", source)
-    source = re.sub(r"(?is)\s+on[a-z]+\s*=\s*(['\"]).*?\1", "", source)
-    source = re.sub(r"(?is)\s+on[a-z]+\s*=\s*[^\s>]+", "", source)
-    source = re.sub(r"(?is)\s+href\s*=\s*(['\"])\s*javascript:.*?\1", ' href="#"', source)
-    source = re.sub(r"(?is)\s+href\s*=\s*javascript:[^\s>]+", ' href="#"', source)
     # Runtime-only "already bound" markers the page script sets on elements;
     # if they get saved, the next page load skips binding and buttons go dead.
     source = re.sub(r"(?is)\s+data-(?:tabs|pkg-tab|label-sync)-bound\s*=\s*(['\"]).*?\1", "", source)
