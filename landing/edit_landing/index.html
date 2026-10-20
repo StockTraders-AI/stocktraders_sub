@@ -1881,12 +1881,20 @@
       const month = match[2].padStart(2, "0");
       return new Date(`${match[3]}-${month}-${day}T00:00:00+07:00`);
     }
-    return new Date("2026-08-02T00:00:00+07:00");
+    return null;
+  }
+
+  // A landing that drives the cd-* boxes with its own script owns them; the
+  // platform ticking too would overwrite its values every second.
+  function landingOwnsCountdown(area) {
+    return Array.from(area.querySelectorAll?.("script") || []).some((s) => /cd-[dhms]\b/.test(s.textContent || ""));
   }
 
   function updateCountdown() {
     const area = getEditableArea() || document;
+    if (landingOwnsCountdown(area)) return;
     const launch = parseCountdownDate(area);
+    if (!launch) return;
     const now = new Date();
     const diff = launch - now;
     const liveEl = document.getElementById("countdown-live");
